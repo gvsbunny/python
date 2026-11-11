@@ -103,7 +103,7 @@ const SIM = (() => {
       }
       t += FD;
     }
-    return { pts, step: FD, dur: t, firstBounce, boundaryT, boundaryAir, stopT, phi };
+    return { pts, step: FD, dur: t, firstBounce, boundaryT, boundaryAir, stopT, phi, speed, elev };
   }
   function shot(contact, dtv, aim, loft, k = 1) {
     const g = grade(dtv, k);

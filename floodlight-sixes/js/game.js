@@ -138,7 +138,7 @@ function handPos(P, out) {
 }
 
 /* ---------- match state ---------- */
-function newInnings(bat) { return { bat, runs: 0, wkts: 0, balls: 0, overLog: [], all: [], stats: [], striker: 0, nonStriker: 1, next: 2, bowlerIdx: 10, bowlerType: 'pace', figs: {}, target: null, fours: 0, sixes: 0 }; }
+function newInnings(bat) { return { bat, runs: 0, wkts: 0, balls: 0, overLog: [], all: [], stats: [], striker: 0, nonStriker: 1, next: 2, bowlerIdx: 10, bowlerType: 'pace', figs: {}, target: null, fours: 0, sixes: 0, wheel: [] }; }
 function newMatch() {
   const ti = S.settings.team;
   let oi = Math.floor(Math.random() * 5); if (oi >= ti) oi++;
@@ -222,7 +222,7 @@ function banner(kind, big, sub) {
   b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
 }
 function toast(text) { const t = $('#toast'); t.textContent = text; t.hidden = false; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); }
-function showTiming(dtv, label) { $('#timing').hidden = false; $('#tLabel').textContent = label; $('#tNeedle').style.left = (clamp(dtv / 0.2, -1, 1) * 50 + 50) + '%'; }
+function showTiming(dtv, label, shot) { $('#timing').hidden = false; $('#tLabel').textContent = label; $('#tShot').textContent = shot || ''; $('#tNeedle').style.left = (clamp(dtv / 0.2, -1, 1) * 50 + 50) + '%'; }
 function setHint(h) { $('#hint').innerHTML = h || ''; }
 function drawRadar() {
   const c = $('#radar'), g = c.getContext('2d'), w = c.width, cx = w / 2, s = (w / 2 - 8) / 64;
@@ -234,6 +234,16 @@ function drawRadar() {
   g.strokeStyle = 'rgba(255,224,160,.95)'; g.lineWidth = 3; g.stroke();
   g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 1.5; g.setLineDash([5, 5]); g.beginPath(); g.arc(cx, cx, 27.4 * s, 0, 7); g.stroke(); g.setLineDash([]);
   const [px, py] = map(0, 0); g.fillStyle = '#d7c39a'; g.fillRect(px - 4, py - 10 * s - 2, 8, 20 * s + 4);
+  if (S.match && S.match.inns.length) {
+    const wl = I().wheel || [], [ox, oy] = map(0, -8.6);
+    g.lineCap = 'round';
+    wl.slice(-14).forEach((e, i, arr) => {
+      const [x, y] = map(e.x, e.z), last = i === arr.length - 1;
+      g.strokeStyle = e.wk ? 'rgba(255,84,100,.95)' : e.runs >= 6 ? 'rgba(255,211,77,.95)' : e.runs >= 4 ? 'rgba(54,198,255,.95)' : 'rgba(255,255,255,.5)';
+      g.lineWidth = last ? 3.4 : 1.8; g.beginPath(); g.moveTo(ox, oy); g.lineTo(x, y); g.stroke();
+      if (last) { g.fillStyle = g.strokeStyle; g.beginPath(); g.arc(x, y, 4.5, 0, 7); g.fill(); }
+    });
+  }
   const fc = S.match ? S.match.teams[1 - I().bat].c1 : '#fff';
   G.fieldAll.forEach(P => { const [x, y] = map(P.g.position.x, P.g.position.z); g.fillStyle = '#04101a'; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); g.fillStyle = fc; g.beginPath(); g.arc(x, y, 5.5, 0, 7); g.fill(); });
   g.fillStyle = '#fff';
@@ -246,10 +256,16 @@ function fieldData() {
   return G.fielders.map(P => ({ role: P.data.role, x: P.g.position.x, z: P.g.position.z, speed: P.data.speed || 7, react: P.data.react || 0.3, reach: P.data.reach || 1.3 }))
     .concat([{ role: 'bowler', x: 0.5, z: 6.5, speed: 5.5, react: 0.3, reach: 1.3 }]);
 }
+function refreshFans() {
+  GUIDE.fansUpdate(fieldData());
+  const st = GUIDE.fanStates();
+  document.querySelectorAll('#shotPad button').forEach(b => { const a = +b.dataset.aim; b.dataset.gap = st[a < -0.4 ? 0 : a > 0.4 ? 2 : 1] || ''; });
+}
 function setupBall() {
   resetPositions();
   $('#timing').hidden = true; $('#speed').hidden = true; $('#replayTag').hidden = true;
   W.marker.visible = false; W.bands.visible = false;
+  GUIDE.reset(); GUIDE.fansShow(false); swingOn = false;
   syncBatters(false);
   const inn = I(), m = S.match, rookie = S.settings.level === 'rookie';
   S.B = { t: 0, ru: 0, swung: false, pending: null, contact: false, plan: null, it: 0, done: false };
@@ -261,14 +277,14 @@ function setupBall() {
     S.B.del = SIM.delivery(inn.bowlerType, lx, lz);
     S.B.wait = 1.0; S.phase = 'wait';
     $('#bowlCtl').hidden = true; $('#shotPad').hidden = false; $('#hud').classList.add('batting');
+    GUIDE.fanScale = rookie ? 1 : 0.75; refreshFans(); GUIDE.fansShow(true);
     const guide = m.guide < 6;
     $('#aimGuide').hidden = !guide;
-    setHint(guide ? 'Press a <b>shot button</b> as the ball reaches you, or tap the screen where you want it to go' : '');
+    setHint(guide ? 'Press a <b>shot button</b> as the ball arrives · <b style="color:#58f08a">green</b> = a gap in the field' : '');
   } else {
     S.lastView = 'bowl'; S.cam = 'bowl';
     S.phase = 'aim';
-    W.bands.visible = true; W.marker.visible = true;
-    W.marker.position.set(S.target.x, 0.035, S.target.z);
+    W.bands.visible = true; W.marker.visible = true; GUIDE.markTo(S.target.x, S.target.z); GUIDE.markFade(1);
     $('#bowlCtl').hidden = false; $('#meter').hidden = true; $('#bowlBtn').hidden = false; $('#types').hidden = false; $('#shotPad').hidden = true; $('#hud').classList.remove('batting');
     $('#aimGuide').hidden = true;
     setHint('Tap the pitch to set your length · <b>' + SIM.lengthZone(S.target.z) + '</b>');
@@ -294,9 +310,9 @@ function release() {
   { const h = handR(G.bowler, new THREE.Vector3()); B.relOff = { x: h.x - d.pts[0], y: h.y - d.pts[1], z: h.z - d.pts[2] }; }
   B.relRec = S.recT;
   $('#speed').hidden = false; $('#speed').innerHTML = `${d.kmh} km/h <em>· ${d.label} · ${d.zone}</em>`;
-  if (userBatting()) { W.marker.visible = true; W.marker.position.set(d.lx, 0.035, d.lz); W.marker.material.opacity = 0.9; }
+  if (userBatting()) { W.marker.visible = true; GUIDE.markTo(d.lx, d.lz); GUIDE.markFade(0.95); }
   else {
-    W.marker.visible = false; W.bands.visible = false;
+    W.bands.visible = false; GUIDE.markTo(d.lx, d.lz); GUIDE.markFade(0.9); W.marker.visible = true;
     const inn = I(), m = S.match, rookie = S.settings.level === 'rookie';
     let loftP = rookie ? 0.22 : 0.3;
     if (inn.target) { const need = inn.target - inn.runs, left = m.maxBalls - inn.balls; loftP = clamp(0.25 + (need / Math.max(1, left) - 1.2) * 0.25, 0.15, 0.85); }
@@ -312,6 +328,15 @@ function shotClip(aim, loft, ballY) {
   if (ballY > 0.95) return aim > 0.15 ? 'cut' : 'pull';
   return loft ? 'loft' : 'drive';
 }
+function shotName(clip, aim, loft) {
+  const side = aim > 0.4 ? 'off' : aim < -0.4 ? 'leg' : 'mid';
+  if (clip === 'pull') return loft ? 'Hooked pull' : 'Pull shot';
+  if (clip === 'cut') return loft ? 'Upper cut' : 'Square cut';
+  if (loft) return side === 'off' ? 'Lofted cover drive' : side === 'leg' ? 'Slog over midwicket' : 'Lofted straight hit';
+  return side === 'off' ? 'Cover drive' : side === 'leg' ? 'On drive' : 'Straight drive';
+}
+const SWING = { drive: { b: 27, c: 40, k: 47 }, loft: { b: -5, c: 54, k: 56 }, pull: { b: -34, c: 55, k: 22 }, cut: { b: -17, c: 25 + 30, k: 25 } };   // natural direction (deg) and joint sensitivities, measured
+const GRADE_COL = { perfect: 0xffd34d, good: 0x7dffb0, ok: 0xffffff, edge: 0xff6b5a };
 function trySwing(dtv, aim, loft, isUser) {
   const B = S.B;
   if (B.swung || S.phase !== 'delivery') return;
@@ -323,7 +348,14 @@ function trySwing(dtv, aim, loft, isUser) {
   const clip = shotClip(aim, loft, B.del.ideal.y);
   B.clip = clip;
   const st = G.striker;
-  st.extra = p => { p.bat[1] += aim * 0.45; p.chest[1] += -aim * 0.25; };
+  B.shotName = shotName(clip, aim, loft);
+  GUIDE.fansShow(false); if (isUser) GUIDE.fanPulse(aim);
+  { // turn the whole stroke toward the chosen direction: hips lead, then chest, then bat
+    const sw = SWING[clip] || SWING.drive, want = -aim * 1.4 * 57.3, d = clamp(want - sw.b, -105, 105);
+    const yh = 0.55 * d / 57.3, yc = 0.3 * d / sw.c, yb = 0.15 * d / sw.k;
+    st.extraK = 0;
+    st.extra = p => { const k = st.extraK; p.hips[1] += yh * k; p.chest[1] += yc * k; p.bat[1] += yb * k; };
+  }
   const ahead = Math.max(0, B.del.idealT - B.t);      // seconds until the ball reaches the hitting zone
   const tc = 0.12;
   if (g !== 'miss' && ahead > tc) B.swingDelay = ahead - tc;
@@ -331,7 +363,7 @@ function trySwing(dtv, aim, loft, isUser) {
   if (isUser) {
     const ms = Math.round(Math.abs(dtv) * 1000);
     const lbl = g === 'perfect' ? 'Perfect timing' : g === 'miss' ? (dtv < 0 ? 'Way too early' : 'Way too late') : `${dtv < 0 ? 'Early' : 'Late'} · ${ms} ms`;
-    showTiming(dtv, lbl);
+    showTiming(dtv, lbl, B.shotName);
     S.match.guide++;
     $('#aimGuide').hidden = true;
   }
@@ -352,6 +384,8 @@ function doContact() {
   S.phase = 'inplay'; B.it = 0;
   S.cam = 'chase';
   W.marker.visible = false;
+  { const gc = GRADE_COL[sh.grade] || 0xffffff; GUIDE.swingColor(gc); GUIDE.traceBegin(); GUIDE.ray(sh.fl.phi, gc); B.maxY = 0; B.bounceMk = false; }
+  if (B.user) $('#tShot').textContent = `${B.shotName} · ${Math.round(sh.fl.speed * 3.6)} km/h`;
   planFielding();
   if (sh.grade === 'perfect' && B.user) toast('Perfect timing');
 }
@@ -415,6 +449,12 @@ function finishBall(o) {
     B.outIdx = inn.striker;
     if (inn.wkts < m.maxWkts) { inn.striker = inn.next; inn.next++; }
   } else if (o.runs % 2 === 1) { [inn.striker, inn.nonStriker] = [inn.nonStriker, inn.striker]; }
+  GUIDE.traceEnd(); GUIDE.fansShow(false); W.marker.visible = false;
+  if (B.contact && B.fl) {
+    const r = B.res, e = (r && (r.kind === 'six' || r.kind === 'four')) ? SIM.sample(B.fl.pts, B.fl.step, r.t, {}) : { x: W.ball.position.x, z: W.ball.position.z };
+    const d = Math.hypot(e.x, e.z + 8.6) || 1, k = Math.min(1, (SIM.BOUNDARY - 1) / d);
+    inn.wheel.push({ x: e.x * k, z: (e.z + 8.6) * k - 8.6, runs: o.runs, wk: !!o.wicket });
+  }
   updateHUD(true);
   if (o.banner) banner(o.banner[0], o.banner[1], o.banner[2]);
   // celebrations
@@ -455,6 +495,7 @@ function startReplay() {
   else { t0 = (B.contactRec != null ? B.contactRec : B.relRec) - 0.65; t1 = (B.eventRec != null ? B.eventRec : B.contactRec + 2) + 0.9; }
   t0 = Math.max(range[0], t0); t1 = Math.min(range[1], t1);
   if (t1 - t0 < 0.4) return afterBall();
+  GUIDE.reset();
   S.replay = { kind, t0, t1, t: t0, speed: 0.42, catcher: B.chaser ? B.chaser.g.position.clone() : null };
   S.phase = 'replay'; S.cam = 'replay';
   $('#replayTag').hidden = false; $('#timing').hidden = true; $('#shotPad').hidden = true; $('#speed').hidden = true; setHint('');
@@ -479,11 +520,13 @@ function replayCam(R) {
 }
 
 /* ---------- per-frame game logic ---------- */
-const tmpV = new THREE.Vector3();
+const tmpV = new THREE.Vector3(), tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+let swingOn = false;
 function tickGame(dt) {
   const B = S.B; if (!B) return;
   S.recT += dt;
   const st = G.striker;
+  if (userBatting() && !B.swung && (S.phase === 'wait' || S.phase === 'runup' || S.phase === 'delivery')) { B.fanT = (B.fanT || 0) - dt; if (B.fanT <= 0) { B.fanT = 0.25; refreshFans(); } }
 
   if (S.phase === 'replay') {
     const R = S.replay;
@@ -496,8 +539,7 @@ function tickGame(dt) {
   if (S.phase === 'wait') { B.wait -= dt; if (B.wait <= 0) startRunup(); }
 
   if (S.phase === 'aim' || S.phase === 'meter') {
-    W.marker.position.set(S.target.x, 0.035, S.target.z);
-    W.marker.scale.setScalar(1 + Math.sin(performance.now() / 180) * 0.08);
+    GUIDE.markTo(S.target.x, S.target.z);
     if (S.phase === 'meter') { B.mt += dt; B.mu = Math.sin(B.mt * 4.4); $('#mNeedle').style.left = (B.mu * 50 + 50) + '%'; }
   }
 
@@ -507,11 +549,17 @@ function tickGame(dt) {
     bw.g.position.z = lerp(B.ruFrom, 9.45, k); bw.g.position.x = 0.1;
     bw.phase += dt * (3.2 + (B.ruFrom - 9.45) / B.ruDur * 1.1);
     if (!B.bowlStarted && B.ru >= B.ruDur - 0.38) { B.bowlStarted = true; act(bw, 'bowl', 0.8, { fade: 0.08 }); G.striker.rest = 'backlift'; G.striker.lock = 0; }
-    if (userBatting()) { const show = S.settings.level === 'rookie' ? 0.15 : 0.4; W.marker.visible = k > show; W.marker.position.set(B.del.lx, 0.035, B.del.lz); W.marker.material.opacity = 0.35 + 0.55 * k; }
+    if (userBatting()) { const show = S.settings.level === 'rookie' ? 0.15 : 0.4; W.marker.visible = k > show; GUIDE.markTo(B.del.lx, B.del.lz); GUIDE.markFade(0.35 + 0.65 * k); }
   }
 
   // animate everybody, then attach the ball to hands where needed
+  if (st.extra && st.extraK < 1) st.extraK = Math.min(1, st.extraK + dt / 0.13);
   updateRigs(dt);
+  { const a = st.anim, stroke = a.name === 'drive' || a.name === 'loft' || a.name === 'pull' || a.name === 'cut';
+    if (stroke && a.t > 0.05 && a.t < 0.55) {
+      if (!swingOn) { GUIDE.swingBegin(); swingOn = true; }
+      st.bat.localToWorld(tmpA.set(0, -0.84, 0)); st.bat.localToWorld(tmpB.set(0, -0.4, 0)); GUIDE.swingPush(tmpA, tmpB);
+    } else if (swingOn) { GUIDE.swingEnd(); swingOn = false; } }
 
   if (S.phase === 'runup') {
     const h = handR(G.bowler, tmpV);
@@ -560,6 +608,7 @@ function tickGame(dt) {
         const six = r.kind === 'six';
         const dist = Math.round(Math.hypot(p.x, p.z + 8.1) + (six ? 12 : 0));
         banner(six ? 'six' : 'four', six ? 'Six!' : 'Four!', six ? `${dist} metres` : 'Into the boards');
+        GUIDE.traceMark(p.x, p.z, six ? 0xffd34d : 0x36c6ff);
         screenEvent(six ? 'SIX' : 'FOUR', six ? 'SIX!' : 'FOUR!', six ? `${dist}m` : '');
         W.boardFlash(six ? 'six' : 'four');
         SND.swell(six ? 1 : 0.7); SND.stinger(six); if (six) SND.horn(0.6);
@@ -578,7 +627,7 @@ function tickGame(dt) {
       else if (r.kind === 'caught') {
         p = handPos(P, new THREE.Vector3());
         if (!B.flashed) {
-          B.flashed = true; B.eventRec = S.recT; SND.glove();
+          B.flashed = true; B.eventRec = S.recT; SND.glove(); GUIDE.traceMark(P.g.position.x, P.g.position.z, 0xff5468);
           if (!B.dive) { act(P, 'catch', 0.7, { fade: 0.08 }); }
           P.rest = 'celebrate';
           banner('out', 'Caught!', `${P.data.role === 'bowler' ? 'caught and bowled' : 'taken at ' + P.data.role}`);
@@ -588,7 +637,7 @@ function tickGame(dt) {
         if (B.it < r.t) p = r.dropped ? { x: r.at.x, y: 0.05, z: r.at.z } : SIM.sample(fl.pts, fl.step, B.it, {});
         else {
           const tt = B.it - r.t, pick = 0.35;
-          if (!B.picked) { B.picked = true; act(P, 'stop', 0.25, { fade: 0.06 }); }
+          if (!B.picked) { B.picked = true; act(P, 'stop', 0.25, { fade: 0.06 }); GUIDE.traceMark(r.at.x, r.at.z, 0xffffff); }
           if (tt >= 0.15 && !B.thrown) { B.thrown = true; act(P, 'throw', 0.6, { fade: 0.05 }); const toB = Math.hypot(r.at.x, r.at.z - 10.06) < Math.hypot(r.at.x, r.at.z + 10.06); P.g.rotation.y = Math.atan2(-P.g.position.x, (toB ? 10 : -10) - P.g.position.z); }
           const hand = handR(P, new THREE.Vector3());
           if (tt < pick) p = hand;
@@ -605,6 +654,9 @@ function tickGame(dt) {
       }
     }
     W.placeBall(p, false);
+    GUIDE.tracePush(p);
+    B.maxY = Math.max(B.maxY || 0, p.y);
+    if (!B.bounceMk && B.maxY > 1.4 && p.y < 0.09) { B.bounceMk = true; GUIDE.traceMark(p.x, p.z, 0xffffff); }
     if (B.it >= B.endT) {
       const runs = r.runs || 0;
       if (r.kind === 'caught') finishBall({ runs: 0, wicket: true, how: 'caught', replay: 'caught' });
@@ -718,7 +770,7 @@ function releaseMeter() {
   S.B.del = SIM.delivery(S.bowlType, lx, lz);
   toast(a < 0.15 ? 'Perfect release' : a < 0.45 ? 'Good release' : 'Wayward');
   $('#bowlCtl').hidden = true;
-  W.marker.position.set(lx, 0.035, lz); W.bands.visible = false; W.marker.visible = false;
+  GUIDE.markTo(lx, lz); W.bands.visible = false; W.marker.visible = false;
   setHint('');
   startRunup();
 }

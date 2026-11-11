@@ -37,7 +37,7 @@ const BAT_POS = { x: 0.42, z: -9.3 }, NS_POS = { x: -1.3, z: 9.6 };
 
 const S = {
   phase: 'loading',
-  settings: { team: 0, overs: 2, level: 'pro', time: 'night' },
+  settings: { team: 0, overs: 2, level: 'pro', time: 'night', start: 'toss' },
   match: null, B: null,
   bowlType: 'pace', target: { x: -0.05, z: -4.2 },
   cam: 'orbit', slow: 1, slowT: 0, shake: 0, paused: false,
@@ -109,7 +109,18 @@ function resetPositions() {
   const ns = G.nonStriker; ns.g.position.set(NS_POS.x, 0, NS_POS.z); ns.g.rotation.y = Math.PI; ns.target = null; ns.lock = 0; ns.rest = 'ns'; ns.moveAnim = null; ns.anim.play('ns', { fade: 0.2 });
   W.resetStumps(); W.hideBall();
 }
+const _bat = new THREE.Vector3(), _bowl = new THREE.Vector3(), _stumps = new THREE.Vector3(0, 0.9, -10);
+function setLooks() {
+  const ball = W.ball.visible ? W.ball.position : null, ph = S.phase;
+  _bat.copy(G.striker.g.position).setY(1.4); _bowl.copy(G.bowler.g.position).setY(1.65);
+  for (const P of G.all) {
+    if (P === G.striker) { P.look = (ball && (ph === 'delivery' || ph === 'inplay')) ? ball : _bowl; P.lookW = 0.95; }
+    else if (P === G.bowler) { P.look = (ph === 'runup' || ph === 'wait' || ph === 'aim' || ph === 'meter' || (ph === 'delivery' && S.B && S.B.t < 0.3)) ? _stumps : (ball || _bat); P.lookW = 0.9; }
+    else { P.look = ball || _bat; P.lookW = 0.8; }
+  }
+}
 function updateRigs(dt) {
+  setLooks();
   for (const P of G.all) {
     const moving = RIG.step(P, dt);
     if (P.lock > 0) P.lock -= dt;
@@ -249,16 +260,16 @@ function setupBall() {
     const lx = clamp(-0.15 + SIM.gauss() * (rookie ? 0.18 : 0.25), -0.85, 0.5);
     S.B.del = SIM.delivery(inn.bowlerType, lx, lz);
     S.B.wait = 1.0; S.phase = 'wait';
-    $('#bowlCtl').hidden = true;
+    $('#bowlCtl').hidden = true; $('#shotPad').hidden = false; $('#hud').classList.add('batting');
     const guide = m.guide < 6;
     $('#aimGuide').hidden = !guide;
-    setHint(guide ? 'Tap <b>left</b>, <b>straight</b> or <b>right</b> as the ball reaches you' : '');
+    setHint(guide ? 'Press a <b>shot button</b> as the ball reaches you, or tap the screen where you want it to go' : '');
   } else {
     S.lastView = 'bowl'; S.cam = 'bowl';
     S.phase = 'aim';
     W.bands.visible = true; W.marker.visible = true;
     W.marker.position.set(S.target.x, 0.035, S.target.z);
-    $('#bowlCtl').hidden = false; $('#meter').hidden = true; $('#bowlBtn').hidden = false; $('#types').hidden = false;
+    $('#bowlCtl').hidden = false; $('#meter').hidden = true; $('#bowlBtn').hidden = false; $('#types').hidden = false; $('#shotPad').hidden = true; $('#hud').classList.remove('batting');
     $('#aimGuide').hidden = true;
     setHint('Tap the pitch to set your length · <b>' + SIM.lengthZone(S.target.z) + '</b>');
   }
@@ -280,6 +291,7 @@ function startRunup() {
 }
 function release() {
   S.phase = 'delivery'; const B = S.B, d = B.del; B.t = 0;
+  { const h = handR(G.bowler, new THREE.Vector3()); B.relOff = { x: h.x - d.pts[0], y: h.y - d.pts[1], z: h.z - d.pts[2] }; }
   B.relRec = S.recT;
   $('#speed').hidden = false; $('#speed').innerHTML = `${d.kmh} km/h <em>· ${d.label} · ${d.zone}</em>`;
   if (userBatting()) { W.marker.visible = true; W.marker.position.set(d.lx, 0.035, d.lz); W.marker.material.opacity = 0.9; }
@@ -445,7 +457,7 @@ function startReplay() {
   if (t1 - t0 < 0.4) return afterBall();
   S.replay = { kind, t0, t1, t: t0, speed: 0.42, catcher: B.chaser ? B.chaser.g.position.clone() : null };
   S.phase = 'replay'; S.cam = 'replay';
-  $('#replayTag').hidden = false; $('#timing').hidden = true; $('#speed').hidden = true; setHint('');
+  $('#replayTag').hidden = false; $('#timing').hidden = true; $('#shotPad').hidden = true; $('#speed').hidden = true; setHint('');
   $('#banner').classList.remove('show');
   camPos.copy(replayCam(S.replay, true).pos);
 }
@@ -494,7 +506,7 @@ function tickGame(dt) {
     const k = Math.min(1, B.ru / B.ruDur), bw = G.bowler;
     bw.g.position.z = lerp(B.ruFrom, 9.45, k); bw.g.position.x = 0.1;
     bw.phase += dt * (3.2 + (B.ruFrom - 9.45) / B.ruDur * 1.1);
-    if (!B.bowlStarted && B.ru >= B.ruDur - 0.36) { B.bowlStarted = true; act(bw, 'bowl', 0.8, { fade: 0.08 }); G.striker.rest = 'backlift'; G.striker.lock = 0; }
+    if (!B.bowlStarted && B.ru >= B.ruDur - 0.38) { B.bowlStarted = true; act(bw, 'bowl', 0.8, { fade: 0.08 }); G.striker.rest = 'backlift'; G.striker.lock = 0; }
     if (userBatting()) { const show = S.settings.level === 'rookie' ? 0.15 : 0.4; W.marker.visible = k > show; W.marker.position.set(B.del.lx, 0.035, B.del.lz); W.marker.material.opacity = 0.35 + 0.55 * k; }
   }
 
@@ -510,6 +522,7 @@ function tickGame(dt) {
   if (S.phase === 'delivery') {
     B.t += dt;
     const d = B.del, p = SIM.sample(d.pts, d.dt, B.t, {});
+    if (B.relOff) { const k = Math.max(0, 1 - B.t / 0.14); p.x += B.relOff.x * k; p.y += B.relOff.y * k; p.z += B.relOff.z * k; }
     W.placeBall(p, B.t <= dt * 1.01);
     if (B.t > d.idealT - 0.25 && G.fielders[0].rest !== 'keeperUp') G.fielders[0].rest = 'keeperUp';
     if (B.swingDelay != null) { B.swingDelay -= dt; if (B.swingDelay <= 0) { act(st, B.clip, 1.0, { fade: 0.06 }); st.rest = 'stance'; B.swingDelay = null; } }
@@ -626,7 +639,7 @@ function tickCamera(dt, t) {
     const a = t * 0.12;
     pos = tA.set(Math.sin(a) * 9 + 1, 2.2, -9 + Math.cos(a) * 9); look = tB.set(0.3, 1.1, -9.3); fov = 40; k = 1;
   } else if (S.cam === 'bat') {
-    pos = tA.set(-0.35, narrow ? 3.5 : 3.05, narrow ? -13.6 : -12.8); look = tB.set(0, 0.6, 6); fov = narrow ? 64 : 50;
+    pos = tA.set(-0.75, narrow ? 3.7 : 3.3, narrow ? -15.2 : -14.6); look = tB.set(-0.1, 0.25, 5); fov = narrow ? 62 : 46;
   } else if (S.cam === 'bowl') {
     const aiming = S.phase === 'aim' || S.phase === 'meter';
     pos = tA.set(0.5, aiming ? 7.5 : 3.3, aiming ? 19.5 : 25.5); look = tB.set(0, 0.4, aiming ? -5 : -8); fov = narrow ? 64 : 48;
@@ -710,6 +723,12 @@ function releaseMeter() {
   startRunup();
 }
 $('#bowlBtn').addEventListener('click', startMeter);
+$('#shotPad').addEventListener('pointerdown', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  ev.preventDefault(); SND.init();
+  b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit');
+  userSwing(+b.dataset.aim, b.dataset.loft === '1');
+});
 $('#types').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
   SND.click();
@@ -753,6 +772,7 @@ function buildMenu() {
   pillSet('#optOvers', 'overs', v => +v);
   pillSet('#optLevel', 'level', v => v);
   pillSet('#optTime', 'time', v => v);
+  pillSet('#optStart', 'start', v => v);
   $('#playBtn').addEventListener('click', () => { SND.init(); newMatch(); showVs(); });
   $('#brkBtn').addEventListener('click', () => { startInnings(1); enterPlay(); });
   $('#againBtn').addEventListener('click', () => { newMatch(); showVs(); });
@@ -778,6 +798,14 @@ function showVs() {
   $('#tossText').innerHTML = 'Call the toss. <b>Heads</b> shows your crest.';
   const btns = $('#tossBtns'); btns.innerHTML = '';
   const mk = (label, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'cta' + (cls ? ' ' + cls : ''); b.innerHTML = `<span>${label}</span>`; b.addEventListener('click', fn); btns.appendChild(b); return b; };
+  if (S.settings.start === 'bat' || S.settings.start === 'bowl') {
+    const bat = S.settings.start === 'bat';
+    $('.coin-stage').hidden = true;
+    $('#tossText').innerHTML = bat ? `You're <b>batting first</b>. Set a target for ${Bt.name}.` : `You're <b>bowling first</b>. Keep ${Bt.name} to a small total.`;
+    mk(bat ? 'Walk out to bat' : 'Take the new ball', '', () => { startInnings(bat ? 0 : 1); enterPlay(); });
+    return;
+  }
+  $('.coin-stage').hidden = false;
   const call = side => {
     SND.click(); btns.innerHTML = '';
     const heads = Math.random() < 0.5, won = (side === 'heads') === heads;

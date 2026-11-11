@@ -166,23 +166,66 @@ const RIG = (() => {
     let bat = null;
     if (o.batter) {
       bat = j.bat = new THREE.Group(); chest.add(bat);
-      mk(cyl(0.017, 0.019, 0.27, 10), trim, bat, 0, -0.135, 0);
-      mk(sphere(0.022, 8, 6), trim, bat, 0, 0, 0);
-      const blade = mk(box(0.108, 0.56, 0.032), M.blade, bat, 0, -0.55, 0.0);
-      const spine = mk(cyl(0.035, 0.035, 0.5, 10, false, Math.PI / 2, Math.PI), M.bladeEdge, bat, 0, -0.56, -0.012); spine.scale.set(1.3, 1, 0.75);
-      const toe = mk(cyl(0.054, 0.054, 0.032, 14, false, Math.PI / 2, Math.PI), M.blade, bat, 0, -0.83, 0); toe.rotation.set(Math.PI / 2, 0, 0); toe.scale.set(1, 1, 0.25);
-      const band = mk(box(0.11, 0.06, 0.034), trim, bat, 0, -0.32, 0.001);
+      buildBat(bat, trim, team);
     }
     scene.add(root);
     const P = { g: root, j, bat, o, anim: new Animator(), phase: Math.random() * 6, target: null, team, shirt, pants, capMat, trim };
     P.anim.rig = P;
     return P;
   }
+  let willowTex = null;
+  function willow() {
+    if (willowTex) return willowTex;
+    const c = document.createElement('canvas'); c.width = 128; c.height = 512; const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 128, 0); gr.addColorStop(0, '#c9a467'); gr.addColorStop(0.18, '#ecd3a0'); gr.addColorStop(0.82, '#ecd3a0'); gr.addColorStop(1, '#c9a467');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 512);
+    for (let i = 0; i < 26; i++) { const x = 8 + i * 4.5 + Math.random() * 2; g.strokeStyle = `rgba(150,110,60,${0.12 + Math.random() * 0.12})`; g.lineWidth = 0.8 + Math.random(); g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + 2, 170, x - 2, 340, x + 1, 512); g.stroke(); }
+    willowTex = new THREE.CanvasTexture(c); willowTex.encoding = THREE.sRGBEncoding; willowTex.anisotropy = 4;
+    return willowTex;
+  }
+  function stickerTex(team, label) {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 256; const g = c.getContext('2d');
+    g.clearRect(0, 0, 128, 256);
+    g.fillStyle = team.c1; g.fillRect(6, 10, 116, 150);
+    g.fillStyle = team.c2; g.fillRect(6, 120, 116, 40);
+    g.save(); g.translate(64, 70); g.rotate(-Math.PI / 2); g.fillStyle = '#ffffff'; g.font = '900 46px "Saira Condensed","Arial Narrow",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 0, 0, 100); g.restore();
+    g.fillStyle = '#ffffff'; g.font = '800 26px "Saira Condensed","Arial Narrow",sans-serif'; g.textAlign = 'center'; g.fillText('FS', 64, 148);
+    g.fillStyle = team.c1; g.fillRect(6, 214, 116, 30);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  }
+  function buildBat(bat, trim, team) {
+    const mkb = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; bat.add(m); return m; };
+    // handle with ribbed rubber grip
+    const grip = trim;
+    mkb(cyl(0.0165, 0.018, 0.27, 12), grip, 0, -0.135, 0);
+    for (let i = 0; i < 7; i++) { const r = mkb(torus(0.0172, 0.0028, 4, 14), grip, 0, -0.025 - i * 0.034, 0); r.rotation.x = Math.PI / 2; }
+    mkb(sphere(0.02, 10, 8), grip, 0, 0, 0).scale.set(1, 0.6, 1);
+    // blade outline in the face plane: sloping shoulders, straight edges, rounded toe
+    const sh = new THREE.Shape();
+    sh.moveTo(-0.018, -0.265); sh.quadraticCurveTo(-0.05, -0.285, -0.054, -0.33); sh.lineTo(-0.054, -0.8);
+    sh.quadraticCurveTo(-0.054, -0.84, 0, -0.842); sh.quadraticCurveTo(0.054, -0.84, 0.054, -0.8); sh.lineTo(0.054, -0.33);
+    sh.quadraticCurveTo(0.05, -0.285, 0.018, -0.265); sh.lineTo(-0.018, -0.265);
+    const bg = new THREE.ExtrudeGeometry(sh, { depth: 0.024, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.004, bevelSegments: 2, curveSegments: 10 });
+    bg.translate(0, 0, -0.012);
+    // planar UVs so the grain runs along the blade
+    const pa = bg.attributes.position, uv = bg.attributes.uv;
+    for (let i = 0; i < pa.count; i++) uv.setXY(i, (pa.getX(i) + 0.06) / 0.12, (pa.getY(i) + 0.85) / 0.6);
+    const wm = new THREE.MeshStandardMaterial({ map: willow(), roughness: 0.5, metalness: 0 });
+    mkb(bg, wm);
+    // the spine down the back of the blade
+    const sp = mkb(new THREE.CylinderGeometry(0.03, 0.026, 0.44, 14, 1, false, Math.PI / 2, Math.PI), wm, 0, -0.6, -0.012); sp.scale.set(1.4, 1, 0.9);
+    // stickers on the face and the back
+    const st = new THREE.MeshStandardMaterial({ map: stickerTex(team, team.abbr || 'FS'), transparent: true, roughness: 0.4 });
+    bat.userData.sticker = st;
+    const f = mkb(new THREE.PlaneGeometry(0.096, 0.19), st, 0, -0.43, 0.0175);
+    const bk = mkb(new THREE.PlaneGeometry(0.07, 0.14), st, 0, -0.42, -0.04); bk.rotation.y = Math.PI;
+  }
   function recolor(P, team, number, name) {
     P.team = team;
     if (P.shirt.map) P.shirt.map.dispose();
     P.shirt.map = jerseyTex(team, number, name); P.shirt.needsUpdate = true;
     P.pants.color.set(team.c2); P.capMat.color.set(team.c2); P.trim.color.set(team.c1);
+    if (P.bat && P.bat.userData.sticker) { const st = P.bat.userData.sticker; if (st.map) st.map.dispose(); st.map = stickerTex(team, team.abbr); st.needsUpdate = true; }
   }
 
   /* ---------- poses ---------- */
@@ -207,12 +250,12 @@ const RIG = (() => {
   const KEEPER = pose(IDLE, { hy: -0.5, chest: [0.55, 0, 0], head: [-0.5, 0, 0], thL: [-1.45, 0, 0.38], knL: [2.25, 0, 0], ftL: [-0.8, 0, 0], thR: [-1.45, 0, -0.38], knR: [2.25, 0, 0], ftR: [-0.8, 0, 0], shL: [-1.0, 0, 0.1], shR: [-1.0, 0, -0.1], elL: [-0.5, 0, 0], elR: [-0.5, 0, 0] });
   const KEEPER_UP = pose(KEEPER, { hy: -0.25, chest: [0.3, 0, 0], head: [-0.25, 0, 0], thL: [-0.8, 0, 0.3], knL: [1.2, 0, 0], ftL: [-0.4, 0, 0], thR: [-0.8, 0, -0.3], knR: [1.2, 0, 0], ftR: [-0.4, 0, 0], shL: [-1.4, 0, 0.0], shR: [-1.4, 0, 0.0], elL: [-0.4, 0, 0], elR: [-0.4, 0, 0] });
   // Batter, built side-on: model +x points at the bowler, model +z is the off side.
-  const STANCE = pose(null, { hy: -0.05, chest: [0.32, 0.12, -0.05], neck: [0, 0.5, 0], head: [-0.12, 0.75, 0.05], thL: [-0.12, 0, 0.17], knL: [0.28, 0, 0], ftL: [-0.15, 0.3, 0], thR: [-0.12, 0, -0.17], knR: [0.28, 0, 0], ftR: [-0.15, 0.1, 0], bp: [0.02, -0.08, 0.26], bat: [0.1, 0, -0.32] });
-  const BACKLIFT = pose(STANCE, { hy: -0.06, chest: [0.25, 0.2, 0.05], bp: [-0.12, 0.12, 0.18], bat: [0.05, 0, -2.05] });
-  const DRIVE_C = pose(STANCE, { hy: -0.16, chest: [0.4, -0.05, -0.3], neck: [0.1, 0.45, 0], head: [0.15, 0.7, 0.1], thL: [-0.35, 0, 0.6], knL: [0.55, 0, 0], ftL: [-0.2, 0.4, -0.3], thR: [0.1, 0, -0.32], knR: [0.55, 0, 0], ftR: [0.2, 0, 0], bp: [0.18, -0.2, 0.3], bat: [0, 0, 0.12] });
-  const DRIVE_F = pose(DRIVE_C, { hy: -0.13, chest: [0.15, -0.25, -0.15], head: [-0.15, 0.7, 0.05], bp: [0.1, 0.32, 0.12], bat: [0.2, 0, 2.55] });
-  const LOFT_C = pose(DRIVE_C, { hy: -0.12, chest: [0.25, -0.05, -0.18], bat: [0, 0, 0.35] });
-  const LOFT_F = pose(LOFT_C, { hy: -0.08, chest: [-0.1, -0.45, 0.05], neck: [-0.1, 0.35, 0], head: [-0.4, 0.6, 0], thL: [-0.2, 0, 0.45], knL: [0.2, 0, 0], bp: [-0.02, 0.5, 0.0], bat: [-0.35, 0, 3.0] });
+  const STANCE = pose(null, { hy: -0.1, chest: [0.42, 0.25, -0.02], neck: [0, 0.45, 0], head: [-0.35, 0.65, 0], thL: [-0.2, 0, 0.2], knL: [0.45, 0, 0], ftL: [-0.25, 0.35, 0], thR: [-0.2, 0, -0.16], knR: [0.45, 0, 0], ftR: [-0.25, 0.15, 0], bp: [0.0, -0.18, 0.3], bat: [0.25, 0, -0.2] });
+  const BACKLIFT = pose(STANCE, { hy: -0.1, chest: [0.36, 0.38, 0.02], bp: [-0.1, 0.2, 0.2], bat: [0.2, 0.25, -2.45] });
+  const DRIVE_C = pose(STANCE, { hy: -0.2, chest: [0.55, 0.05, -0.35], neck: [0.1, 0.4, 0], head: [0.1, 0.6, 0.1], thL: [-0.45, 0, 0.55], knL: [0.6, 0, 0], ftL: [-0.2, 0.5, -0.2], thR: [0.2, 0, -0.3], knR: [0.5, 0, 0], ftR: [0.3, 0, 0], bp: [0.2, -0.28, 0.3], bat: [0.05, 0, 0.1] });
+  const DRIVE_F = pose(DRIVE_C, { hy: -0.16, chest: [0.2, -0.2, -0.2], head: [-0.1, 0.6, 0.05], bp: [0.12, 0.35, 0.15], bat: [0.3, 0.2, 2.6] });
+  const LOFT_C = pose(DRIVE_C, { hy: -0.16, chest: [0.35, -0.05, -0.2], bat: [0, 0, 0.35] });
+  const LOFT_F = pose(LOFT_C, { hy: -0.1, chest: [-0.05, -0.55, 0.05], neck: [-0.1, 0.35, 0], head: [-0.4, 0.55, 0], thL: [-0.25, 0, 0.45], knL: [0.2, 0, 0], bp: [0, 0.52, 0], bat: [-0.3, 0, 3.05] });
   const PULL_C = pose(STANCE, { hy: -0.06, chest: [0.1, -0.35, 0.12], head: [0, 0.8, 0], thL: [-0.1, 0, 0.2], thR: [0.0, 0, -0.32], knR: [0.2, 0, 0], bp: [0.08, 0.12, 0.34], bat: [-1.45, 0, 0.25] });
   const PULL_F = pose(PULL_C, { chest: [0.0, -0.95, 0.1], head: [-0.1, 1.1, 0], bp: [-0.05, 0.3, 0.05], bat: [-1.45, -2.1, 0.6] });
   const PULL_B = pose(PULL_C, { chest: [0.15, 0.25, 0.0], bp: [-0.1, 0.25, 0.25], bat: [-0.4, 0.3, -1.8] });
@@ -224,12 +267,14 @@ const RIG = (() => {
 
   // Bowling action (model faces down the pitch)
   const BOWL_K = [
-    { t: 0.0, p: pose(IDLE, { hy: 0.02, chest: [0.15, 0, 0], shL: [-0.6, 0, 0.2], shR: [0.4, 0, -0.15], elL: [-0.6, 0, 0], elR: [-0.4, 0, 0], thL: [-0.6, 0, 0], knL: [0.9, 0, 0], thR: [0.4, 0, 0], knR: [0.6, 0, 0] }) },
-    { t: 0.16, p: pose(IDLE, { hy: 0.2, chest: [-0.28, -0.9, 0], head: [0, 0.7, 0], shL: [-2.8, 0, 0.2], elL: [-0.2, 0, 0], shR: [0.9, 0, -0.2], elR: [-0.2, 0, 0], thL: [-0.9, 0, 0], knL: [1.3, 0, 0], thR: [0.2, 0, 0], knR: [0.9, 0, 0] }) },
-    { t: 0.3, p: pose(IDLE, { hy: -0.02, chest: [-0.1, -0.6, 0], head: [0, 0.4, 0], shL: [-1.6, 0, 0.6], elL: [-0.3, 0, 0], shR: [2.6, 0, -0.15], elR: [0, 0, 0], thL: [-0.55, 0, 0], knL: [0.12, 0, 0], thR: [0.6, 0, 0], knR: [0.7, 0, 0] }) },
-    { t: 0.36, p: pose(IDLE, { hy: -0.05, chest: [0.15, -0.1, 0], head: [0.1, 0.1, 0], shL: [-0.6, 0, 0.7], elL: [-0.6, 0, 0], shR: [3.35, 0, -0.1], elR: [0, 0, 0], thL: [-0.5, 0, 0], knL: [0.15, 0, 0], thR: [0.7, 0, 0], knR: [0.9, 0, 0] }) },
-    { t: 0.52, p: pose(IDLE, { hy: -0.12, chest: [0.7, 0.35, 0], head: [-0.4, 0, 0], shL: [0.3, 0, 0.5], elL: [-0.5, 0, 0], shR: [5.2, 0, 0.3], elR: [-0.3, 0, 0], thL: [-0.2, 0, 0], knL: [0.4, 0, 0], thR: [-0.2, 0, 0], knR: [1.2, 0, 0] }) },
-    { t: 0.8, p: pose(IDLE, { hy: -0.06, chest: [0.4, 0.2, 0], head: [-0.2, 0, 0], shL: [0.2, 0, 0.3], elL: [-0.5, 0, 0], shR: [5.9, 0, 0.1], elR: [-0.5, 0, 0], thL: [-0.4, 0, 0], knL: [0.6, 0, 0], thR: [0.3, 0, 0], knR: [0.8, 0, 0] }) },
+    // last stride, bound, side-on coil, front-foot plant, release over the top, follow-through, recovery
+    { t: 0.0, p: pose(IDLE, { chest: [0.25, 0, 0], shL: [-0.9, 0, 0.15], elL: [-1.2, 0, 0], shR: [0.5, 0, -0.15], elR: [-0.9, 0, 0], thL: [-0.7, 0, 0], knL: [0.6, 0, 0], thR: [0.5, 0, 0], knR: [1.1, 0, 0], ftR: [0.3, 0, 0] }) },
+    { t: 0.13, p: pose(IDLE, { hy: 0.24, hips: [0, -0.3, 0], chest: [0.05, -0.4, 0], head: [0, 0.4, 0], shL: [-1.9, 0, -0.25], elL: [-1.3, 0, 0], shR: [-1.6, 0, 0.25], elR: [-1.6, 0, 0], thL: [-1.25, 0, 0], knL: [1.5, 0, 0], ftL: [-0.3, 0, 0], thR: [0.25, 0, 0], knR: [1.3, 0, 0], ftR: [0.4, 0, 0] }) },
+    { t: 0.24, p: pose(IDLE, { hy: -0.04, hips: [0, -0.85, 0], chest: [-0.18, -0.55, 0], head: [0.05, 1.2, 0], shL: [-2.95, 0, 0.1], elL: [-0.15, 0, 0], shR: [0.75, 0, -0.25], elR: [-0.15, 0, 0], thL: [-1.05, 0, 0], knL: [1.1, 0, 0], ftL: [-0.2, 0, 0], thR: [0.15, 0, 0], knR: [0.45, 0, 0] }) },
+    { t: 0.32, p: pose(IDLE, { hy: -0.08, hips: [0, -0.5, 0], chest: [-0.22, -0.35, 0], head: [0.05, 0.75, 0], shL: [-2.2, 0, 0.55], elL: [-0.3, 0, 0], shR: [2.1, 0, -0.2], elR: [-0.05, 0, 0], thL: [-0.62, 0, 0], knL: [0.06, 0, 0], ftL: [0.1, 0, 0], thR: [0.6, 0, 0], knR: [0.75, 0, 0], ftR: [0.4, 0, 0] }) },
+    { t: 0.38, p: pose(IDLE, { hy: -0.06, hips: [0, 0.05, 0], chest: [0.12, 0.15, 0.05], head: [0.05, -0.15, 0], shL: [0.15, 0, 0.5], elL: [-1.1, 0, 0], shR: [3.45, 0, -0.12], elR: [0, 0, 0], thL: [-0.55, 0, 0], knL: [0.02, 0, 0], thR: [0.8, 0, 0], knR: [0.65, 0, 0], ftR: [0.6, 0, 0] }) },
+    { t: 0.52, p: pose(IDLE, { hy: -0.3, hips: [0.15, 0.5, 0], chest: [1.05, 0.45, 0], head: [-0.9, 0, 0], shL: [0.9, 0, 0.3], elL: [-0.6, 0, 0], shR: [5.4, 0, 0.75], elR: [-0.3, 0, 0], thL: [-0.55, 0, 0], knL: [0.6, 0, 0], thR: [-0.5, 0, 0], knR: [1.2, 0, 0] }) },
+    { t: 0.8, p: pose(IDLE, { hy: -0.05, chest: [0.35, 0.1, 0], head: [-0.3, 0, 0], shL: [0.3, 0, 0.15], elL: [-0.8, 0, 0], shR: [5.95, 0, 0.15], elR: [-0.8, 0, 0], thL: [-0.4, 0, 0], knL: [0.7, 0, 0], thR: [0.35, 0, 0], knR: [0.9, 0, 0] }) },
   ];
   const THROW_K = [
     { t: 0, p: pose(IDLE, { chest: [0.1, 0.4, 0], shR: [1.0, 0, -0.3], shL: [-1.2, 0, 0.3], elR: [-0.3, 0, 0], thL: [-0.4, 0, 0.15], knL: [0.3, 0, 0], thR: [0.3, 0, -0.1], knR: [0.4, 0, 0] }) },
@@ -383,5 +428,5 @@ const RIG = (() => {
     return true;
   }
 
-  return { build, recolor, CLIPS, face, turnToward, step, lerpAng, jerseyTex };
+  return { build, recolor, CLIPS, face, turnToward, step, lerpAng, jerseyTex, stickerTex };
 })();

@@ -290,6 +290,8 @@ const AV = (() => {
       else if (r === 'helmet' || r === 'cap') m.color.set(team.c2);
       else if (r === 'trim') m.color.set(team.c1);
     });
+    if (P.bat && P.bat.userData.sticker) { const st = P.bat.userData.sticker; if (st.map) st.map.dispose(); st.map = RIG.stickerTex(team, team.abbr); st.needsUpdate = true; }
+    if (P.trim) P.trim.color.set(team.c1);
   }
 
   /* ---------- driving the skeleton from the pose rig ---------- */
@@ -372,13 +374,31 @@ const AV = (() => {
       MAIN.forEach(n => S.moc[n].copy(S.bones[n].quaternion));
       S.mocHips = S.bones.Hips.position.clone();
     }
-    if (S.w >= 0.99) { S.o.updateMatrixWorld(true); return; }
+    if (S.w >= 0.99) { S.o.updateMatrixWorld(true); look(P, S); return; }
     procedural(P, S);
     if (S.w > 0.01) {
       MAIN.forEach(n => S.bones[n].quaternion.slerp(S.moc[n], S.w));
       S.bones.Hips.position.lerp(S.mocHips, S.w);
       S.o.updateMatrixWorld(true);
     }
+    look(P, S);
+  }
+  // keep the eyes on a point (the ball, the batter) without breaking the neck
+  const lm = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0);
+  function look(P, S) {
+    const tgt = P.look; if (!tgt) return;
+    const H = S.bones.Head, N = S.bones.Neck;
+    const hp = H.getWorldPosition(V());
+    const f = V().subVectors(tgt, hp); if (f.lengthSq() < 0.01) return; f.normalize();
+    const chestF = new THREE.Vector3(0, 0, 1).applyQuaternion(S.bones.Spine2.getWorldQuaternion(Q()).multiply(A.restWorldQ.Spine2.clone().invert()));
+    const along = f.dot(chestF);
+    let w = (P.lookW == null ? 0.85 : P.lookW) * Math.max(0, Math.min(1, (along + 0.35) / 0.6));
+    if (w <= 0.01) return;
+    lm.lookAt(tgt, hp, UP);
+    const want = Q().setFromRotationMatrix(lm).multiply(A.restWorldQ.Head);
+    const cur = H.getWorldQuaternion(Q());
+    setWorldQ(N, N.getWorldQuaternion(Q()).slerp(want.clone().multiply(A.restWorldQ.Head.clone().invert()).multiply(A.restWorldQ.Neck), w * 0.35));
+    setWorldQ(H, cur.slerp(want, w));
   }
   function replayObjects(P) { const S = P.av; return S ? MAIN.map(n => S.bones[n]).filter(Boolean) : []; }
   function handWorld(P, side, out) { const S = P.av; if (!S) return null; return S.bones[(side === 'L' ? 'Left' : 'Right') + 'Hand'].getWorldPosition(out || V()); }

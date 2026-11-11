@@ -443,13 +443,13 @@ const WORLD = (() => {
   function buildBall() {
     const tex = canvasTex(256, 128, (g, w, h) => {
       g.fillStyle = '#fbfbf6'; g.fillRect(0, 0, w, h);
-      g.strokeStyle = '#9aa0a8'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+      g.strokeStyle = '#8c939c'; g.lineWidth = 7; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
       g.strokeStyle = '#7b818a'; g.lineWidth = 1.5; for (let x = 0; x < w; x += 6) { g.beginPath(); g.moveTo(x, h / 2 - 6); g.lineTo(x + 3, h / 2 + 6); g.stroke(); }
     });
-    W.ball = new THREE.Mesh(new THREE.SphereGeometry(0.07, 20, 14), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35, emissive: 0x666666 }));
+    W.ball = new THREE.Mesh(new THREE.SphereGeometry(0.06, 24, 16), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, emissive: 0x2a2a2a, emissiveMap: tex }));
     W.ball.castShadow = true;
     W.ballGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(200,230,255,.3)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
-    W.ballGlow.scale.set(0.6, 0.6, 1); W.ball.add(W.ballGlow); scene.add(W.ball);
+    W.ballGlow.scale.set(0.3, 0.3, 1); W.ballGlow.material.opacity = 0.55; W.ball.add(W.ballGlow); scene.add(W.ball);
     const blob = canvasTex(64, 64, g => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(0,0,0,.65)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); });
     W.blobMat = new THREE.MeshBasicMaterial({ map: blob, transparent: true, depthWrite: false });
     W.ballShadow = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.45), W.blobMat.clone());

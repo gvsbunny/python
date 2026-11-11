@@ -119,7 +119,7 @@ const WORLD = (() => {
   /* ---------- photographic sky + grass ---------- */
   function loadEnv(base) {
     const jobs = [];
-    if (THREE.RGBELoader) {
+    if (THREE.RGBELoader && W.useHdr) {
       const pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
       W.hdr = {};
       ['day'].forEach(k => jobs.push(new Promise(res => {

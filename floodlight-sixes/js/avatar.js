@@ -11,7 +11,7 @@ const AV = (() => {
   function load(base, onProgress) {
     const L = new THREE.GLTFLoader();
     const get = (f) => new Promise((res, rej) => L.load(base + f, res, e => onProgress && e.total && onProgress(f, e.loaded / e.total), rej));
-    return Promise.all([get('player.glb'), get('moves.glb')]).then(([p, m]) => {
+    return Promise.all([get('player.json'), get('moves.json')]).then(([p, m]) => {
       A.base = p.scene; A.moves = m;
       prepareBase();
       A.clips = {};

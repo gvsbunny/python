@@ -38,7 +38,7 @@ const WORLD = (() => {
     W.renderer = renderer; W.scene = scene; W.camera = camera;
     if (THREE.RoomEnvironment) {
       const pm = new THREE.PMREMGenerator(renderer);
-      scene.environment = pm.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+      scene.environment = W.roomEnv = pm.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
       pm.dispose();
     }
     if (hasPost()) {
@@ -90,7 +90,7 @@ const WORLD = (() => {
         ' if (uDay > 0.5 && y > 0.02) { vec2 uv = vP.xz / (y + 0.25) * 1.6 + vec2(uTime * 0.01, 0.0); float cl = smoothstep(0.5, 0.82, fbm(uv)); c = mix(c, vec3(1.0, 1.0, 1.0), cl * 0.85 * smoothstep(0.02, 0.25, y)); }',
         ' gl_FragColor = vec4(c, 1.0); }'].join('\n'),
     });
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(700, 32, 16), W.skyMat));
+    W.skySphere = new THREE.Mesh(new THREE.SphereGeometry(700, 32, 16), W.skyMat); scene.add(W.skySphere);
     const sp = [];
     for (let i = 0; i < 900; i++) { const a = Math.random() * Math.PI * 2, e = 0.2 + Math.random() * 1.25; sp.push(Math.cos(a) * Math.cos(e) * 650, Math.sin(e) * 650, Math.sin(a) * Math.cos(e) * 650); }
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
@@ -116,6 +116,34 @@ const WORLD = (() => {
     W.fill2 = new THREE.DirectionalLight(0xffe8c8, 0.35); W.fill2.position.set(40, 50, -60); scene.add(W.fill2);
     scene.fog = new THREE.Fog(0x0b1528, 160, 600);
   }
+  /* ---------- photographic sky + grass ---------- */
+  function loadEnv(base) {
+    const jobs = [];
+    if (THREE.RGBELoader) {
+      const pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
+      W.hdr = {};
+      ['day'].forEach(k => jobs.push(new Promise(res => {
+        new THREE.RGBELoader().setDataType(THREE.UnsignedByteType).load(base + 'sky-' + k + '.hdr', t => {
+          W.hdr[k] = { env: pm.fromEquirectangular(t).texture, bg: t };
+          t.mapping = THREE.EquirectangularReflectionMapping; res();
+        }, undefined, () => res());
+      })));
+    }
+    jobs.push(new Promise(res => new THREE.TextureLoader().load(base + 'grass.jpg', t => {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(26, 26); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+      const m = W.groundMat, marks = m.map;
+      marks.wrapS = marks.wrapT = THREE.ClampToEdgeWrapping;
+      m.map = t; m.userData.marks = marks;
+      m.onBeforeCompile = sh => {
+        sh.uniforms.uMarks = { value: marks };
+        sh.vertexShader = 'varying vec2 vRawUv;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvRawUv = uv;');
+        sh.fragmentShader = 'uniform sampler2D uMarks;\nvarying vec2 vRawUv;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+          '#include <map_fragment>\nvec4 mk = texture2D(uMarks, vRawUv);\nfloat lum = dot(mk.rgb, vec3(0.333));\n diffuseColor.rgb = diffuseColor.rgb * vec3(0.62, 0.86, 0.5) * (0.55 + lum * 1.25);\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92), smoothstep(0.62, 0.8, mk.g - mk.r * 0.2) * step(0.9, mk.a));');
+      };
+      m.needsUpdate = true; res();
+    }, undefined, () => res())));
+    return Promise.all(jobs);
+  }
   function setTime(mode) {
     const day = mode === 'day';
     W.day = day;
@@ -123,6 +151,8 @@ const WORLD = (() => {
     u.uDay.value = day ? 1 : 0;
     u.top.value.copy(lin(day ? 0x2f6fcb : 0x02050d)); u.mid.value.copy(lin(day ? 0x7fb4ea : 0x0d1a36)); u.low.value.copy(lin(day ? 0xd8e8f4 : 0x2b2a4a));
     W.stars.visible = !day;
+    const h = W.hdr && W.hdr[day ? 'day' : 'night'];
+    scene.environment = (day && h) ? h.env : W.roomEnv;
     W.skyline.material.opacity = day ? 0.0 : 1;
     scene.fog.color.set(day ? 0xc3d8ec : 0x0b1528); scene.fog.near = day ? 260 : 160; scene.fog.far = day ? 900 : 600;
     W.hemi.color.set(day ? 0xe4f0ff : 0xa9bdff); W.hemi.groundColor.set(day ? 0x4e7040 : 0x1c3a20); W.hemi.intensity = day ? 0.8 : 0.55;
@@ -157,7 +187,8 @@ const WORLD = (() => {
       g.restore();
       const vg = g.createRadialGradient(c, c, 30 * PX, c, c, R * PX); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,15,0,.3)'); g.fillStyle = vg; g.fillRect(0, 0, w, w);
     });
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(R, 160), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0, envMapIntensity: 0.3 }));
+    W.groundMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0, envMapIntensity: 0.3 });
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(R, 160), W.groundMat);
     ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
     // pitch
     const ptex = canvasTex(256, 2080, (g, w, h) => {
@@ -327,9 +358,9 @@ const WORLD = (() => {
     W.screens = [];
     [0.42, Math.PI + 0.42].forEach(a => {
       const r = 104, x = Math.sin(a) * r, z = Math.cos(a) * r;
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(27, 14, 1.2), new THREE.MeshStandardMaterial({ color: 0x12151c, roughness: 0.6, metalness: 0.4 }));
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(27, 14, 0.5), new THREE.MeshStandardMaterial({ color: 0x12151c, roughness: 0.6, metalness: 0.4 }));
       frame.position.set(x, 47, z); frame.lookAt(0, 30, 0); scene.add(frame);
-      const scr = new THREE.Mesh(new THREE.PlaneGeometry(25.5, 12.75), mat); scr.position.copy(frame.position); scr.lookAt(0, 30, 0); scr.translateZ(0.65); scene.add(scr);
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(25.5, 12.75), mat); scr.position.copy(frame.position); scr.lookAt(0, 30, 0); scr.translateZ(0.9); scene.add(scr);
       const leg = new THREE.Mesh(new THREE.BoxGeometry(1, 10, 1), frame.material); leg.position.set(x * 1.01, 36, z * 1.01); scene.add(leg);
       W.screens.push(scr);
     });
@@ -549,6 +580,6 @@ const WORLD = (() => {
     W.ballShadow.position.set(W.ball.position.x, 0.03, W.ball.position.z);
   }
 
-  Object.assign(W, { init, render, resize, setTime, paintCrowd, boardFlash, drawScreen, resetStumps, breakStumps, placeBall, hideBall, fireworks, confetti, tickFx, recTrack, recClear, recCapture, recRange, recApply, canvasTex, hasPost });
+  Object.assign(W, { loadEnv, init, render, resize, setTime, paintCrowd, boardFlash, drawScreen, resetStumps, breakStumps, placeBall, hideBall, fireworks, confetti, tickFx, recTrack, recClear, recCapture, recRange, recApply, canvasTex, hasPost });
   return W;
 })();

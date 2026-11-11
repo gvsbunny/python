@@ -86,12 +86,17 @@ function buildRigs() {
   G.all = [...G.fielders, G.bowler, G.striker, G.nonStriker];
   G.fieldAll = [...G.fielders, G.bowler];
   G.all.forEach(P => { P.rest = 'idle'; P.lock = 0; });
+  if (AV.ready) {
+    G.fielders.forEach(P => AV.create(P, P.data.role === 'keeper' ? 'keeper' : 'fielder'));
+    AV.create(G.bowler, 'fielder'); AV.create(G.striker, 'batter'); AV.create(G.nonStriker, 'batter');
+  }
   const objs = [];
-  G.all.forEach(P => { objs.push(P.g); Object.values(P.j).forEach(o => objs.push(o)); });
+  G.all.forEach(P => { objs.push(P.g); Object.values(P.j).forEach(o => objs.push(o)); AV.replayObjects(P).forEach(o => objs.push(o)); });
   objs.push(W.ball, ...W.stumps[0]);
   W.recTrack(objs);
   resetPositions();
 }
+function kit(P, team, num, name) { if (P.av) AV.dress(P, team, num, name); else RIG.recolor(P, team, num, name); }
 function act(P, name, dur, opt) { P.anim.play(name, Object.assign({ restart: true, fade: 0.12 }, opt || {})); P.lock = dur; }
 function resetPositions() {
   G.fielders.forEach(P => {
@@ -111,9 +116,12 @@ function updateRigs(dt) {
     else if (moving) P.anim.play(P.moveAnim || (P.target && P.target.speed < 3.2 ? 'jog' : 'run'), { fade: 0.15 });
     else P.anim.play(P.rest, { fade: 0.2 });
     P.anim.update(dt);
+    AV.drive(P, dt);
   }
 }
+function handR(P, out) { return (P.av && AV.handWorld(P, 'R', out)) || P.j.haR.getWorldPosition(out || new THREE.Vector3()); }
 function handPos(P, out) {
+  if (P.av) { const a = AV.handWorld(P, 'L'), b = AV.handWorld(P, 'R'); return (out || new THREE.Vector3()).copy(a).add(b).multiplyScalar(0.5); }
   const a = P.j.haL.getWorldPosition(new THREE.Vector3()), b = P.j.haR.getWorldPosition(new THREE.Vector3());
   return (out || new THREE.Vector3()).copy(a).add(b).multiplyScalar(0.5);
 }
@@ -137,7 +145,7 @@ function startInnings(batIdx) {
   if (m.inns.length === 1) inn.target = m.inns[0].runs + 1;
   m.inns.push(inn); m.cur = m.inns.length - 1;
   const bat = m.teams[batIdx], fld = m.teams[1 - batIdx];
-  G.fielders.forEach((P, i) => { const pl = fld.players[i + 1]; RIG.recolor(P, fld, pl.num, pl.short); });
+  G.fielders.forEach((P, i) => { const pl = fld.players[i + 1]; kit(P, fld, pl.num, pl.short); });
   G.batKey = '';
   newBowler();
   syncBatters(true);
@@ -153,7 +161,7 @@ function newBowler() {
   if (fld.user) inn.bowlerType = S.bowlType;
   const pl = fld.players[inn.bowlerIdx];
   if (!inn.figs[inn.bowlerIdx]) inn.figs[inn.bowlerIdx] = { b: 0, r: 0, w: 0 };
-  RIG.recolor(G.bowler, fld, pl.num, pl.short);
+  kit(G.bowler, fld, pl.num, pl.short);
 }
 function syncBatters(force) {
   const m = S.match, inn = I(), team = m.teams[inn.bat];
@@ -161,8 +169,8 @@ function syncBatters(force) {
   const key = a.num + '/' + b.num;
   if (!force && key === G.batKey) return;
   G.batKey = key;
-  RIG.recolor(G.striker, team, a.num, a.short);
-  RIG.recolor(G.nonStriker, team, b.num, b.short);
+  kit(G.striker, team, a.num, a.short);
+  kit(G.nonStriker, team, b.num, b.short);
 }
 
 /* ---------- HUD ---------- */
@@ -494,7 +502,7 @@ function tickGame(dt) {
   updateRigs(dt);
 
   if (S.phase === 'runup') {
-    const h = G.bowler.j.haR.getWorldPosition(tmpV);
+    const h = handR(G.bowler, tmpV);
     W.placeBall({ x: h.x, y: h.y - 0.06, z: h.z }, true); W.trail.visible = false;
     if (B.ru >= B.ruDur) release();
   }
@@ -569,7 +577,7 @@ function tickGame(dt) {
           const tt = B.it - r.t, pick = 0.35;
           if (!B.picked) { B.picked = true; act(P, 'stop', 0.25, { fade: 0.06 }); }
           if (tt >= 0.15 && !B.thrown) { B.thrown = true; act(P, 'throw', 0.6, { fade: 0.05 }); const toB = Math.hypot(r.at.x, r.at.z - 10.06) < Math.hypot(r.at.x, r.at.z + 10.06); P.g.rotation.y = Math.atan2(-P.g.position.x, (toB ? 10 : -10) - P.g.position.z); }
-          const hand = P.j.haR.getWorldPosition(new THREE.Vector3());
+          const hand = handR(P, new THREE.Vector3());
           if (tt < pick) p = hand;
           else {
             const k = clamp((tt - pick) / Math.max(0.1, r.throwT - pick), 0, 1);
@@ -752,15 +760,15 @@ function buildMenu() {
 }
 function previewKits() {
   const t = TEAMS[S.settings.team];
-  G.fieldAll.forEach((P, i) => RIG.recolor(P, t, i + 3, ''));
-  RIG.recolor(G.striker, t, 18, ''); RIG.recolor(G.nonStriker, t, 45, '');
+  G.fieldAll.forEach((P, i) => kit(P, t, i + 3, ''));
+  kit(G.striker, t, 18, ''); kit(G.nonStriker, t, 45, '');
 }
 function save() { try { localStorage.setItem('fs-settings-v2', JSON.stringify(S.settings)); } catch (e) {} }
 function showVs() {
   const m = S.match, A = m.teams[0], Bt = m.teams[1];
   S.phase = 'vs'; S.cam = 'vs';
-  G.fieldAll.forEach((P, i) => { const pl = Bt.players[(i + 1) % 11]; RIG.recolor(P, Bt, pl.num, pl.short); });
-  RIG.recolor(G.striker, A, A.players[0].num, A.players[0].short); RIG.recolor(G.nonStriker, A, A.players[1].num, A.players[1].short);
+  G.fieldAll.forEach((P, i) => { const pl = Bt.players[(i + 1) % 11]; kit(P, Bt, pl.num, pl.short); });
+  kit(G.striker, A, A.players[0].num, A.players[0].short); kit(G.nonStriker, A, A.players[1].num, A.players[1].short);
   showScreen('vs');
   $('#vsKick').textContent = `${S.settings.time === 'day' ? 'Day' : 'Night'} match · ${m.maxBalls / 6} overs · ${m.maxWkts} wickets`;
   $('#vsA').src = crest(A); $('#vsB').src = crest(Bt); $('#vsAn').textContent = A.name; $('#vsBn').textContent = Bt.name;
@@ -871,10 +879,13 @@ function frame(now) {
 }
 
 /* ---------- boot ---------- */
-function start(data) {
+async function start(data) {
   try { const s = JSON.parse(localStorage.getItem('fs-settings-v2') || 'null'); if (s && TEAMS[s.team]) Object.assign(S.settings, s); } catch (e) {}
   const lowEnd = (navigator.hardwareConcurrency || 8) <= 4 || Math.min(screen.width, screen.height) < 500;
   WORLD.init($('#c'), lowEnd ? 'mid' : 'high');
+  const prog = {}, show = () => { const v = Object.values(prog); const p = v.length ? v.reduce((a, b) => a + b, 0) / 2 : 0; $('#loading').textContent = `Switching on the floodlights… ${Math.round(p * 100)}%`; };
+  try { await Promise.all([AV.load('assets/', (f, p) => { prog[f] = p; show(); }), W.loadEnv('assets/')]); }
+  catch (e) { console.warn('Assets did not load; using simple players', e); }
   W.setTime(S.settings.time);
   buildRigs();
   buildMenu();
@@ -885,7 +896,7 @@ function start(data) {
   if (m && !m.done && m.inns && m.inns.length) {
     S.match = m;
     const inn = I(), bat = m.teams[inn.bat], fld = m.teams[1 - inn.bat];
-    G.fielders.forEach((P, i) => { const pl = fld.players[i + 1]; RIG.recolor(P, fld, pl.num, pl.short); });
+    G.fielders.forEach((P, i) => { const pl = fld.players[i + 1]; kit(P, fld, pl.num, pl.short); });
     newBowler(); syncBatters(true); W.paintCrowd(m.teams[0].c1, m.teams[1].c1);
     document.documentElement.style.setProperty('--team', bat.c1); document.documentElement.style.setProperty('--team2', bat.c2); document.documentElement.style.setProperty('--opp', fld.c1);
     enterPlay();

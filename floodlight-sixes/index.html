@@ -142,6 +142,29 @@ button:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
 #replayTag i{width:10px;height:10px;border-radius:50%;background:#fff;animation:blink 1s steps(2) infinite}
 #replayTag small{font-family:var(--f-body);font-weight:600;letter-spacing:0;font-size:12px;opacity:.85}
 @keyframes blink{50%{opacity:0}}
+#replayTag.tv3{background:#5b3df0}
+#lower{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 168px);display:flex;flex-direction:column;gap:3px;padding:10px 20px 11px 16px;background:linear-gradient(90deg,rgba(7,13,28,.96),rgba(7,13,28,.84));border-left:6px solid var(--lc,var(--flood));border-radius:4px 10px 10px 4px;box-shadow:0 10px 30px rgba(0,0,0,.45);max-width:min(560px,calc(100vw - 24px))}
+#lower .l1{font-family:var(--f-display);font-weight:900;font-size:24px;letter-spacing:.06em;text-transform:uppercase;line-height:1.05}
+#lower .l2{font-size:15px;color:var(--muted);font-weight:600}
+#lower .l2:empty{display:none}
+#lower.show{animation:lowerIn .5s cubic-bezier(.2,1.2,.3,1) both}
+@keyframes lowerIn{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+#decision{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;pointer-events:none;background:radial-gradient(ellipse at center,rgba(4,8,18,.55),rgba(4,8,18,0) 70%)}
+#decision .d-kick{font-family:var(--f-display);font-weight:800;letter-spacing:.3em;text-transform:uppercase;font-size:15px;background:#5b3df0;padding:5px 16px;border-radius:4px}
+#decision .d-big{font-family:var(--f-display);font-weight:900;font-style:italic;font-size:clamp(78px,19vw,190px);line-height:.92;padding:0 .14em;-webkit-background-clip:text;background-clip:text;color:transparent}
+#decision.out .d-big{background-image:linear-gradient(180deg,#ffd0d6,#ff4d64 50%,#b5122c);filter:drop-shadow(0 0 30px rgba(255,60,90,.55)) drop-shadow(0 5px 0 rgba(0,0,0,.35))}
+#decision.safe .d-big{background-image:linear-gradient(180deg,#dcffe9,#3ddc84 50%,#0f8a45);filter:drop-shadow(0 0 30px rgba(60,220,130,.5)) drop-shadow(0 5px 0 rgba(0,0,0,.35))}
+#decision .d-sub{font-family:var(--f-display);font-weight:800;font-size:clamp(15px,3.6vw,21px);letter-spacing:.12em;text-transform:uppercase;background:rgba(7,13,28,.9);padding:5px 16px;border-radius:6px}
+#decision .d-sub:empty{display:none}
+#decision.show{animation:decIn .6s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes decIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+#wipe{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#wipe::before{content:"";position:absolute;top:-25%;bottom:-25%;width:62%;left:-80%;background:linear-gradient(90deg,transparent,var(--team) 18%,var(--team2) 50%,var(--team) 82%,transparent);transform:skewX(-18deg)}
+#wipe span{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) skewX(-10deg);font-family:var(--f-display);font-weight:900;font-size:72px;color:#fff;opacity:0;text-shadow:0 4px 20px rgba(0,0,0,.5)}
+#wipe.go::before{animation:wipe .6s cubic-bezier(.6,0,.4,1) both}
+#wipe.go span{animation:wipeLogo .6s ease both}
+@keyframes wipe{from{left:-80%}to{left:125%}}
+@keyframes wipeLogo{0%,100%{opacity:0}40%,62%{opacity:1}}
 /* banner */
 #banner{position:absolute;left:0;right:0;top:24%;display:flex;flex-direction:column;align-items:center;pointer-events:none;opacity:0}
 #banner .rib{position:absolute;left:-5%;right:-5%;top:50%;height:62%;transform:translateY(-62%) skewY(-4deg);background:linear-gradient(90deg,transparent,var(--bc,#ffd34d) 15%,var(--bc,#ffd34d) 85%,transparent);opacity:.24}
@@ -240,6 +263,8 @@ button:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
   .pill button{font-size:13px;padding:7px 2px}
   .logo .l1{font-size:42px}.logo .l2{font-size:76px}
   #aimGuide .z{font-size:12px;padding:6px 8px}
+  #lower{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 222px)}
+  #lower .l1{font-size:19px}#lower .l2{font-size:13px}
   #shotPad{left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));grid-template-columns:auto repeat(3,minmax(0,1fr))}
   #shotPad button{height:50px}
   #hud.batting .bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 132px)}
@@ -264,12 +289,16 @@ button:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
   <div class="tr">
     <div class="btns">
       <button id="bMute" type="button" aria-label="Turn sound off"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="muteWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+      <button id="bCam" type="button" aria-label="Switch camera"><svg viewBox="0 0 24 24"><path d="M3 8h4l2-2.5h6L17 8h4v11H3z"/><circle cx="12" cy="13.5" r="3.6"/></svg></button>
       <button id="bPause" type="button" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
     </div>
     <canvas id="radar" width="236" height="236" aria-label="Field map"></canvas>
   </div>
   <div id="speed" hidden></div>
-  <div id="replayTag" hidden><i></i>Replay<small>tap to skip</small></div>
+  <div id="replayTag" hidden><i></i><b>Replay</b><small>tap to skip</small></div>
+  <div id="lower" hidden><div class="l1"></div><div class="l2"></div></div>
+  <div id="decision" hidden><div class="d-kick">Third umpire</div><div class="d-big">OUT</div><div class="d-sub"></div></div>
+  <div id="wipe" hidden><span>FS</span></div>
   <div id="aimGuide" hidden>
     <div class="z zl">◀ Leg side</div><div class="z zr">Off side ▶</div>
     <div class="line"><span class="u">▲ Tap above to loft</span><span class="d">▼ Below to keep it down</span></div>
@@ -312,7 +341,7 @@ button:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
 
 <section class="screen side" id="menu" hidden>
   <div class="sheet">
-    <div class="kicker">T20 cricket · quick match</div>
+    <div class="kicker">T20 cricket · Dubai night match</div>
     <h1 class="logo"><span class="l1">Floodlight</span><span class="l2">Sixes</span></h1>
     <p class="lede">Read the length, time the ball, and send it through the gaps or over the rope.</p>
     <div><div class="label">Pick your team</div><div class="teams" id="teamPick"></div></div>
@@ -391,3 +420,4 @@ button:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
 <script src="js/avatar.js"></script>
 <script src="js/guide.js"></script>
 <script src="js/game.js"></script>
+<script src="js/broadcast.js"></script>

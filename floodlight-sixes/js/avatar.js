@@ -355,7 +355,7 @@ const AV = (() => {
       setWorldQ(B[sd + 'Foot'], jointWorld(j['ft' + k], sd + 'Foot', Q()));
     }
   }
-  const MOCAP = { idle: 'idle', run: 'run', jog: 'run', dejected: 'walk' };
+  const MOCAP = { idle: 'idle', run: 'run', jog: 'run', dejected: 'walk', walk: 'walk' };
   function drive(P, dt) {
     const S = P.av; if (!S) return;
     const name = P.anim.name;

@@ -317,6 +317,10 @@ const RIG = (() => {
     appeal: staticClip(APPEAL),
     run: { fn: (t, P, out) => runPose(P.phase, P.runAmp == null ? 1 : P.runAmp, out, P.o.batter) },
     jog: { fn: (t, P, out) => runPose(P.phase, 0.45, out, P.o.batter) },
+    walk: { fn: (t, P, out) => { runPose(P.phase, 0.3, out, P.o.batter); out.chest[0] = 0.04; return out; } },
+    stretch: keyClip([{ t: 0, p: pose(IDLE, { hy: -0.1, chest: [0.45, 0, 0], thL: [-0.8, 0, 0], knL: [0.7, 0, 0], thR: [0.5, 0, 0], knR: [0.6, 0, 0], bp: [0.0, -0.05, 0.4], bat: [-0.9, 0, 0] }) },
+      { t: 0.18, p: pose(IDLE, { hy: -0.4, chest: [0.85, 0, 0], head: [-0.6, 0, 0], thL: [-1.15, 0, 0.05], knL: [0.55, 0, 0], ftL: [-0.3, 0, 0], thR: [0.75, 0, -0.05], knR: [0.35, 0, 0], ftR: [0.5, 0, 0], bp: [0.0, -0.12, 0.5], bat: [-1.25, 0, 0] }) },
+      { t: 0.7, p: pose(IDLE, { hy: -0.42, chest: [0.8, 0, 0], head: [-0.55, 0, 0], thL: [-1.1, 0, 0.05], knL: [0.6, 0, 0], ftL: [-0.3, 0, 0], thR: [0.7, 0, -0.05], knR: [0.4, 0, 0], ftR: [0.5, 0, 0], bp: [0.0, -0.12, 0.5], bat: [-1.25, 0, 0] }) }]),
     celebrate: { fn: (t, P, out) => { lerpPose(IDLE, IDLE, 0, out); const h = Math.abs(Math.sin(t * 6 + P.phase)); out.hy = h * 0.22 - 0.02; out.shL = [-0.3, 0, 2.6 + Math.sin(t * 6) * 0.2]; out.shR = [-0.3, 0, -2.6 - Math.sin(t * 6) * 0.2]; out.elL = [-0.3, 0, 0]; out.elR = [-0.3, 0, 0]; out.head = [-0.35, 0, 0]; out.knL = [h * 0.6, 0, 0]; out.knR = [h * 0.6, 0, 0]; out.thL = [-h * 0.3, 0, 0.08]; out.thR = [-h * 0.3, 0, -0.08]; return out; } },
     dejected: { fn: (t, P, out) => { runPose(P.phase, 0.28, out, true); out.head[0] = 0.55; out.chest[0] += 0.15; return out; } },
   };

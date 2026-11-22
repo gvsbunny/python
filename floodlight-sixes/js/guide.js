@@ -81,6 +81,7 @@ const GUIDE = (() => {
     if (G.tracker.visible) {
       const d = cam.position.distanceTo(W.ball.position);
       G.tracker.position.copy(W.ball.position);
+      const ts = innerWidth < innerHeight ? 0.028 : 0.042; G.tracker.scale.set(ts, ts, 1);
       G.tracker.material.opacity = clamp((d - 3) / 4, 0, 0.9);
     }
     if (!s.mesh.visible || n < 2) { s.geo.setDrawRange(0, 0); return; }

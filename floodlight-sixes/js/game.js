@@ -7,6 +7,8 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const W = WORLD;
 
 const TEAMS = [
+  { id: 'ind',    name: 'India',             abbr: 'IND', c1: '#1c6fd6', c2: '#0a2a5e', c3: '#ff9a2e', pool: ['Sharma','Verma','Iyer','Rao','Nair','Reddy','Kumar','Singh','Yadav','Joshi','Desai','Menon','Pillai','Chauhan','Thakur','Pandey','Gill','Saini','Bhat','Kulkarni'] },
+  { id: 'pak',    name: 'Pakistan',          abbr: 'PAK', c1: '#1f8a3b', c2: '#0b3d1c', c3: '#c8f26b', pool: ['Khan','Ahmed','Malik','Hussain','Qureshi','Raza','Shah','Butt','Iqbal','Abbas','Akhtar','Siddiqui','Javed','Mirza','Rehman','Nawaz','Aslam','Zaidi','Haider','Farooq'] },
   { id: 'hawk',   name: 'Harbour Hawks',     abbr: 'HAW', c1: '#1fb7cc', c2: '#0c2f45', c3: '#ffe0a0' },
   { id: 'wave',   name: 'Monsoon Riders',    abbr: 'MON', c1: '#7a6bff', c2: '#1d1650', c3: '#7fe3ff' },
   { id: 'fin',    name: 'Saltpan Sharks',    abbr: 'SAL', c1: '#ff6f5e', c2: '#3d1012', c3: '#ffffff' },
@@ -16,8 +18,8 @@ const TEAMS = [
 ];
 const SURN = ['Iyer','Khan','Fernando','Clarke','Mendis','Rao','Brooks','Joseph','Naidu','Hussain','Walsh','Perera','Kapoor','Malik','Reid','Thomas','Baig','Lewis','Chandra','Hart','Silva','Ahmed','Nair','Grant','Dube','Okafor','Pillai','Shaw','Varma','Coleman','Bose','Wright','Asante','Mehta','Quinn','Sandhu'];
 const INIT = 'ABDGHJKMNPRSTVY';
-function roster() {
-  const names = [...SURN].sort(() => Math.random() - 0.5).slice(0, 11);
+function roster(team) {
+  const names = [...((team && team.pool) || SURN)].sort(() => Math.random() - 0.5).slice(0, 11);
   const nums = [...Array(98).keys()].map(i => i + 1).sort(() => Math.random() - 0.5);
   return names.map((s, i) => ({ name: INIT[Math.floor(Math.random() * INIT.length)] + '. ' + s, short: s, num: nums[i], skin: Math.floor(Math.random() * 6) }));
 }
@@ -37,7 +39,7 @@ const BAT_POS = { x: 0.42, z: -9.3 }, NS_POS = { x: -1.3, z: 9.6 };
 
 const S = {
   phase: 'loading',
-  settings: { team: 0, overs: 2, level: 'pro', time: 'night', start: 'toss' },
+  settings: { team: 0, overs: 2, level: 'pro', time: 'night', start: 'toss', view: 'tv' },
   match: null, B: null,
   bowlType: 'pace', target: { x: -0.05, z: -4.2 },
   cam: 'orbit', slow: 1, slowT: 0, shake: 0, paused: false,
@@ -63,6 +65,17 @@ function crest(team) {
   g.translate(100, 132); g.fillStyle = '#fff'; g.strokeStyle = team.c2; g.lineWidth = 5;
   const P = (pts) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill(); g.stroke(); };
   switch (team.id) {
+    case 'ind': {
+      g.lineWidth = 0; [['#ff9933', -40], ['#ffffff', -10], ['#138808', 20]].forEach(([c, y]) => { g.fillStyle = c; g.fillRect(-70, y, 140, 30); });
+      g.strokeStyle = '#0a2a80'; g.lineWidth = 4; g.beginPath(); g.arc(0, 5, 11, 0, 7); g.stroke();
+      g.fillStyle = '#fff'; g.strokeStyle = team.c2; g.lineWidth = 5; break;
+    }
+    case 'pak': {
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(-4, 8, 40, 0, 7); g.fill();
+      g.fillStyle = team.c1; g.beginPath(); g.arc(10, -4, 36, 0, 7); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); for (let k = 0; k < 10; k++) { const r = k % 2 ? 7 : 17, a = -Math.PI / 2 + k * Math.PI / 5 + 0.6; g.lineTo(26 + Math.cos(a) * r, -22 + Math.sin(a) * r); } g.closePath(); g.fill();
+      break;
+    }
     case 'hawk': P([[-62, -18], [0, 22], [62, -18], [44, 6], [12, 40], [0, 34], [-12, 40], [-44, 6]]); P([[-10, -4], [0, -26], [10, -4], [0, 8]]); break;
     case 'wave': for (let k = 0; k < 3; k++) { g.beginPath(); for (let x = -60; x <= 60; x += 4) g.lineTo(x, -14 + k * 22 + Math.sin(x / 12 + k) * 7); g.lineWidth = 9; g.strokeStyle = '#fff'; g.stroke(); } g.lineWidth = 5; g.beginPath(); g.moveTo(0, -56); g.quadraticCurveTo(18, -30, 0, -24); g.quadraticCurveTo(-18, -30, 0, -56); g.fill(); break;
     case 'fin': P([[-52, 34], [-8, -50], [30, 34]]); g.beginPath(); g.lineWidth = 8; g.strokeStyle = '#fff'; g.moveTo(-70, 40); for (let x = -70; x <= 70; x += 5) g.lineTo(x, 40 + Math.sin(x / 9) * 5); g.stroke(); break;
@@ -92,7 +105,7 @@ function buildRigs() {
   }
   const objs = [];
   G.all.forEach(P => { objs.push(P.g); Object.values(P.j).forEach(o => objs.push(o)); AV.replayObjects(P).forEach(o => objs.push(o)); });
-  objs.push(W.ball, ...W.stumps[0]);
+  objs.push(W.ball, ...W.stumps[0], ...W.stumps[1]);
   W.recTrack(objs);
   resetPositions();
 }
@@ -140,12 +153,13 @@ function handPos(P, out) {
 /* ---------- match state ---------- */
 function newInnings(bat) { return { bat, runs: 0, wkts: 0, balls: 0, overLog: [], all: [], stats: [], striker: 0, nonStriker: 1, next: 2, bowlerIdx: 10, bowlerType: 'pace', figs: {}, target: null, fours: 0, sixes: 0, wheel: [] }; }
 function newMatch() {
-  const ti = S.settings.team;
-  let oi = Math.floor(Math.random() * 5); if (oi >= ti) oi++;
-  const teams = [Object.assign({}, TEAMS[ti], { players: roster(), user: true }), Object.assign({}, TEAMS[oi], { players: roster(), user: false })];
+  const ti = clamp(S.settings.team, 0, TEAMS.length - 1);
+  let oi = Math.floor(Math.random() * (TEAMS.length - 1)); if (oi >= ti) oi++;
+  if (TEAMS[ti].id === 'ind') oi = 1; else if (TEAMS[ti].id === 'pak') oi = 0;      // the rivalry fixture
+  const teams = [Object.assign({}, TEAMS[ti], { players: roster(TEAMS[ti]), user: true }), Object.assign({}, TEAMS[oi], { players: roster(TEAMS[oi]), user: false })];
   const overs = S.settings.overs;
   S.match = { teams, maxBalls: overs * 6, maxWkts: overs === 2 ? 3 : 5, inns: [], cur: 0, done: false, guide: 0 };
-  W.paintCrowd(teams[0].c1, teams[1].c1);
+  W.paintCrowd(teams[0].c1, teams[1].c1); W.paintFlags(teams[0], teams[1]);
 }
 const I = () => S.match.inns[S.match.cur];
 const userBatting = () => !!S.match && I().bat === 0;
@@ -384,10 +398,51 @@ function doContact() {
   S.phase = 'inplay'; B.it = 0;
   S.cam = 'chase';
   W.marker.visible = false;
+  $('#shotPad').hidden = true; $('#aimGuide').hidden = true; setHint('');
   { const gc = GRADE_COL[sh.grade] || 0xffffff; GUIDE.swingColor(gc); GUIDE.traceBegin(); GUIDE.ray(sh.fl.phi, gc); B.maxY = 0; B.bounceMk = false; }
   if (B.user) $('#tShot').textContent = `${B.shotName} · ${Math.round(sh.fl.speed * 3.6)} km/h`;
   planFielding();
   if (sh.grade === 'perfect' && B.user) toast('Perfect timing');
+}
+const LEG = 2.35;   // seconds per run for a sprinting batter
+function planRuns(B) {
+  const r = B.res;
+  let toBowl = Math.hypot(r.at.x, r.at.z - 10.06) < Math.hypot(r.at.x, r.at.z + 10.06);
+  if (B.chaser === G.bowler) toBowl = false;
+  const dEnd = Math.hypot(r.at.x, r.at.z - (toBowl ? 10.06 : -10.06));
+  const throwT = 0.35 + dEnd / 30;
+  const direct = dEnd < 28 ? Math.random() < 0.45 : Math.random() < 0.2;
+  const Tb = r.t + throwT + (direct ? 0 : 0.14);
+  const T = k => 0.3 + k * LEG + (k - 1) * 0.05 - 0.2;   // when the bat is grounded over the crease
+  let safe = 0; while (safe < 3 && T(safe + 1) <= Tb - 0.1) safe++;
+  const inn = I(), m = S.match; let p = 0.16;
+  if (inn.target) { const need = inn.target - inn.runs, left = m.maxBalls - inn.balls; if (left > 0 && need / left > 1.5) p = 0.32; }
+  let k = safe;
+  if (safe < 3 && T(safe + 1) - Tb < 0.3 && Math.random() < p) k = safe + 1;
+  const margin = k ? T(k) - Tb : -9;
+  const strikerToBowl = k % 2 === 1;
+  return { k, safe, end: toBowl ? 1 : 0, direct, Tb, throwT, margin, runnerIsStriker: toBowl ? strikerToBowl : !strikerToBowl, close: k > 0 && (k > safe || margin > -0.22), result: null, short: 0 };
+}
+function breakForRunOut(B) {
+  const ro = B.ro; B.broken = true; B.breakRec = S.recT;
+  W.breakStumps(0.55, ro.end); SND.stumps();
+  if (!ro.direct) act(ro.end ? G.bowler : G.fielders[0], 'stop', 0.4, { fade: 0.05 });
+  const R = ro.runnerIsStriker ? G.striker : G.nonStriker;
+  const tip = R.bat.localToWorld(new THREE.Vector3(0, -0.84, 0)), z = R.g.position.z;
+  const reach = ro.end ? Math.max(tip.z, z) : -Math.min(tip.z, z);
+  ro.short = 8.84 - reach;
+  ro.result = ro.close && ro.short > 0 ? 'out' : 'notout';
+  if (ro.close) { BC.lower('RUN OUT APPEAL', 'Referred to the third umpire', '#7a5cff'); SND.swell(0.5); }
+}
+function settleRunOut(B) {
+  const ro = B.ro, inn = I();
+  S.phase = 'inplay';
+  if (ro.result === 'out') {
+    const outIdx = ro.runnerIsStriker ? inn.striker : inn.nonStriker, R = ro.runnerIsStriker ? G.striker : G.nonStriker;
+    finishBall({ runs: ro.k - 1, wicket: true, how: 'run out', outIdx, outRig: R });
+    toast(`Run out · short by ${Math.max(1, Math.round(ro.short * 100))} cm`);
+  } else { finishBall({ runs: ro.k }); toast(`Not out · ${ro.k} run${ro.k > 1 ? 's' : ''}`); }
+  S.B.replayKind = null;
 }
 function planFielding() {
   const B = S.B, r = B.res, fl = B.fl, n = fl.pts.length / 3 - 1;
@@ -418,20 +473,26 @@ function planFielding() {
     const d = Math.hypot(endP.x - P.g.position.x, endP.z - P.g.position.z);
     if (d < 30) { const k = Math.min(1, 5 / d); P.target = { x: lerp(P.g.position.x, endP.x, k), z: lerp(P.g.position.z, endP.z, k), speed: 3, delay: 0.35 }; }
   });
-  const kp = G.fielders[0]; kp.target = { x: 0.25, z: -10.7, speed: 3, delay: 0.3 }; kp.rest = 'keeperUp';
-  B.runs = r.kind === 'fielded' ? r.runs : 0;
-  if (r.kind === 'fielded') B.endT = Math.max(r.t + r.throwT, B.runs ? 0.3 + B.runs * SIM.RUN_LEG : 0) + 0.35;
+  const kp = G.fielders[0]; kp.target = { x: 0.7, z: -10.45, speed: 3, delay: 0.3 }; kp.rest = 'keeperUp';
+  B.evt = (r.kind === 'six' || r.kind === 'four') ? (q => ({ x: q.x, z: q.z }))(SIM.sample(fl.pts, fl.step, r.t, {})) : { x: r.at.x, z: r.at.z };
+  B.ro = r.kind === 'fielded' ? planRuns(B) : null;
+  B.runs = B.ro ? B.ro.k : 0;
+  if (B.ro) {
+    const legsEnd = B.runs ? 0.3 + B.runs * LEG + (B.runs - 1) * 0.05 : 0;
+    B.endT = Math.max(B.ro.Tb, legsEnd) + (B.runs ? 0.6 : 0.4);
+    if (B.ro.end === 1) G.bowler.target = { x: 0.75, z: 10.45, speed: 6.5, delay: 0.35, done: Q => { Q.rest = 'keeperUp'; RIG.face(Q, 0, 0); } };
+  }
   else if (r.kind === 'caught') B.endT = r.t + 1.0;
   else B.endT = r.t + 1.2;
   // batters set off
   if (B.runs > 0) {
     const legs = B.runs;
-    const runner = (P, x, z0) => {
+    const runner = (P, x) => {
       let leg = 0;
-      const next = () => { if (leg >= legs) { P.rest = P === G.striker ? 'stance' : 'ns'; return; } const z = (leg % 2 === 0 ? -z0 : z0); leg++; P.target = { x, z, speed: 18.6 / SIM.RUN_LEG, delay: leg === 1 ? 0.3 : 0.05, done: next }; };
+      const next = () => { if (leg >= legs) { P.rest = P === G.striker ? 'stance' : 'ns'; P.runLeg = 0; return; } const z = P.g.position.z < 0 ? 9.4 : -9.4; leg++; P.runLeg = leg; P.target = { x, z, speed: Math.abs(z - P.g.position.z) / LEG, delay: leg === 1 ? 0.3 : 0.05, done: next }; };
       P.moveAnim = 'run'; P.runAmp = 1.1; next();
     };
-    runner(G.striker, 0.9, BAT_POS.z); runner(G.nonStriker, -0.9, NS_POS.z - 1.6);
+    runner(G.striker, 0.9); runner(G.nonStriker, -0.9);
   }
 }
 function finishBall(o) {
@@ -445,9 +506,11 @@ function finishBall(o) {
   inn.overLog.push(o.wicket ? 'W' : o.runs);
   inn.all.push(o.wicket ? 'W' : o.runs);
   if (o.wicket) {
-    inn.wkts++; f.w++; s.out = true; s.how = o.how;
-    B.outIdx = inn.striker;
-    if (inn.wkts < m.maxWkts) { inn.striker = inn.next; inn.next++; }
+    inn.wkts++; if (o.how !== 'run out') f.w++;
+    const outIdx = o.outIdx != null ? o.outIdx : inn.striker;
+    const os = inn.stats[outIdx]; os.out = true; os.how = o.how; B.outIdx = outIdx; B.outRig = o.outRig || G.striker;
+    if (o.runs % 2 === 1) [inn.striker, inn.nonStriker] = [inn.nonStriker, inn.striker];
+    if (inn.wkts < m.maxWkts) { if (inn.striker === outIdx) { inn.striker = inn.next++; B.newIdx = inn.striker; } else { inn.nonStriker = inn.next++; B.newIdx = inn.nonStriker; } }
   } else if (o.runs % 2 === 1) { [inn.striker, inn.nonStriker] = [inn.nonStriker, inn.striker]; }
   GUIDE.traceEnd(); GUIDE.fansShow(false); W.marker.visible = false;
   if (B.contact && B.fl) {
@@ -461,10 +524,11 @@ function finishBall(o) {
   if (o.wicket) {
     W.crowdU.uCheer.value = userBatting() ? 0.2 : 1;
     if (userBatting()) SND.groan(); else { SND.swell(0.8); SND.horn(0.3); }
-    screenEvent('OUT', 'OUT!', `${s.p.name} ${s.r} (${s.b})`);
+    const os = inn.stats[B.outIdx], OR = B.outRig;
+    screenEvent('OUT', 'OUT!', `${os.p.name} ${os.r} (${os.b})`);
     W.boardFlash('out');
-    G.striker.rest = 'dejected'; G.striker.lock = 0; G.striker.moveAnim = 'dejected'; G.striker.extra = null;
-    G.striker.target = { x: -14, z: -40, speed: 1.1, delay: 0.6 };
+    OR.rest = 'dejected'; OR.lock = 0; OR.moveAnim = 'dejected'; OR.extra = null;
+    OR.target = { x: -16, z: OR.g.position.z * 1.4 - 22, speed: 1.1, delay: 0.6 };
     const bw = G.bowler; act(bw, 'appeal', 0.9); bw.rest = 'celebrate';
     G.fieldAll.forEach(P => { if (P === bw) return; const d = Math.hypot(P.g.position.x - bw.g.position.x, P.g.position.z - bw.g.position.z); if (d < 40) { const a = Math.random() * 6.28; P.target = { x: bw.g.position.x + Math.cos(a) * 1.6, z: bw.g.position.z + Math.sin(a) * 1.6, speed: 6, delay: 0.2 + Math.random() * 0.3, done: Q => { Q.rest = 'celebrate'; } }; P.moveAnim = null; } });
   }
@@ -473,51 +537,54 @@ function finishBall(o) {
 }
 function afterBall() {
   const m = S.match, inn = I();
-  S.replay = null; $('#replayTag').hidden = true;
+  $('#replayTag').hidden = true;
   const chased = inn.target && inn.runs >= inn.target;
   if (inn.balls >= m.maxBalls || inn.wkts >= m.maxWkts || chased) { return m.cur === 0 ? showBreak() : showResult(); }
+  let kind = 'normal', overRuns = 0;
+  const B0 = S.B;
   if (inn.balls % 6 === 0) {
     [inn.striker, inn.nonStriker] = [inn.nonStriker, inn.striker];
-    const overRuns = inn.overLog.reduce((a, b) => a + (b === 'W' ? 0 : b), 0);
+    overRuns = inn.overLog.reduce((a, b) => a + (b === 'W' ? 0 : b), 0);
     inn.overLog = [];
     newBowler();
-    toast(`End of over ${inn.balls / 6} · ${overRuns} run${overRuns === 1 ? '' : 's'}`);
+    kind = 'over';
   }
-  setupBall();
+  if (B0 && B0.outIdx != null && B0.newIdx != null) kind = 'wicket';
+  else if (kind !== 'over' && B0 && B0.res && (B0.res.kind === 'six' || B0.res.kind === 'four')) kind = 'boundary';
+  startWalk(kind, overRuns);
 }
+function startWalk(kind, overRuns) {
+  const inn = I(), m = S.match, B = S.B, bat = m.teams[inn.bat], fld = m.teams[1 - inn.bat];
+  S.phase = 'walk'; S.cam = 'walk'; S.walkT = kind === 'wicket' ? 3.8 : kind === 'over' ? 3.2 : 2.6;
+  ['#timing', '#speed', '#shotPad', '#bowlCtl', '#aimGuide'].forEach(q => { $(q).hidden = true; }); setHint('');
+  GUIDE.fansShow(false); W.marker.visible = false; W.bands.visible = false; W.hideBall();
+  G.fielders.forEach(P => { P.lock = 0; P.extra = null; P.moveAnim = 'walk'; P.rest = P.data.role === 'keeper' ? 'keeper' : 'idle'; P.target = { x: P.home.x, z: P.home.z, speed: 1.4 + Math.random() * 0.4, delay: Math.random() * 0.5 }; });
+  const bw = G.bowler; bw.lock = 0; bw.moveAnim = 'walk'; bw.rest = 'idle'; bw.target = { x: 0.6, z: 26, speed: 1.55, delay: 0.1 };
+  [G.striker, G.nonStriker].forEach(P => { if (kind === 'wicket' && P === B.outRig) return; P.lock = 0; P.extra = null; P.moveAnim = 'walk'; P.rest = 'ns'; P.target = { x: P.g.position.z > 0 ? -1.4 : 1.2, z: P.g.position.z > 0 ? 10.2 : -10.3, speed: 1.3, delay: 0.2 }; });
+  if (kind === 'wicket') {
+    const R = B.outRig, np = inn.stats[B.newIdx];
+    kit(R, bat, np.p.num, np.p.short);
+    R.g.position.set(-17, 0, -3); R.lock = 0; R.extra = null; R.moveAnim = 'walk'; R.rest = 'stance'; R.anim.play('walk', { restart: true });
+    const T = { x: -1.6, z: -8.8 }; R.target = { x: T.x, z: T.z, speed: 1.45, delay: 0 };
+    BC.cut('newBat', { F: R, T });
+    BC.lower('NEW BATTER', `${np.p.name}  ·  #${np.p.num}`, bat.c1);
+  } else if (kind === 'over') {
+    BC.cut('spider');
+    BC.lower(`END OF OVER ${inn.balls / 6}`, `${overRuns} run${overRuns === 1 ? '' : 's'} · ${bat.abbr} ${inn.runs}/${inn.wkts}` + (inn.target ? ` · need ${Math.max(0, inn.target - inn.runs)} from ${m.maxBalls - inn.balls}` : ''), bat.c1);
+  } else if (kind === 'boundary') {
+    const st = inn.stats[inn.striker];
+    BC.cut('batterCU', { F: G.striker });
+    BC.lower(st.p.name, `${st.r} (${st.b}) · ${inn.fours} fours, ${inn.sixes} sixes`, bat.c1);
+  } else {
+    const bp = fld.players[inn.bowlerIdx], f = inn.figs[inn.bowlerIdx] || { b: 0, r: 0, w: 0 };
+    BC.cut('follow', { F: bw, off: new THREE.Vector3(0.9, 1.65, 6.8) });
+    BC.lower(bp.name, `${f.w}-${f.r} (${oversText(f.b)}) · ${SIM.TYPES[inn.bowlerType].label}`, fld.c1);
+  }
+}
+function endWalk() { BC.lowerHide(); G.batKey = ''; setupBall(); }
 
 /* ---------- replays ---------- */
-function startReplay() {
-  const B = S.B, kind = B.replayKind, range = W.recRange();
-  if (!range) return afterBall();
-  let t0, t1;
-  if (kind === 'bowled') { t0 = B.stumpsRec - 0.75; t1 = B.stumpsRec + 1.1; }
-  else { t0 = (B.contactRec != null ? B.contactRec : B.relRec) - 0.65; t1 = (B.eventRec != null ? B.eventRec : B.contactRec + 2) + 0.9; }
-  t0 = Math.max(range[0], t0); t1 = Math.min(range[1], t1);
-  if (t1 - t0 < 0.4) return afterBall();
-  GUIDE.reset();
-  S.replay = { kind, t0, t1, t: t0, speed: 0.42, catcher: B.chaser ? B.chaser.g.position.clone() : null };
-  S.phase = 'replay'; S.cam = 'replay';
-  $('#replayTag').hidden = false; $('#timing').hidden = true; $('#shotPad').hidden = true; $('#speed').hidden = true; setHint('');
-  $('#banner').classList.remove('show');
-  camPos.copy(replayCam(S.replay, true).pos);
-}
-const _rp = new THREE.Vector3(), _rl = new THREE.Vector3();
-function replayCam(R) {
-  const b = W.ball.position;
-  let fov = 38;
-  if (R.kind === 'bowled') { _rp.set(0.9, 0.42, -13.4); _rl.set(0, 0.45, -8.5); fov = 34; }
-  else if (R.kind === 'caught' && R.catcher) {
-    const c = R.catcher, dx = c.x, dz = c.z + 8, d = Math.hypot(dx, dz) || 1;
-    _rp.set(-dx / d * 6 + (c.x * 0.15), 5 + d * 0.06, -8 - dz / d * 6); _rl.set(b.x, Math.max(0.5, b.y), b.z);
-    fov = clamp(46 - Math.hypot(b.x - _rp.x, b.z - _rp.z) * 0.25, 18, 46);
-  } else {
-    const k = clamp((R.t - R.t0) / (R.t1 - R.t0), 0, 1);
-    _rp.set(-17 + k * 4, 1.8 + k * 9, -7 + b.z * 0.25); _rl.set(b.x, Math.max(0.6, b.y), b.z);
-    fov = clamp(30 + Math.hypot(b.x, b.z + 8) * 0.25, 30, 58);
-  }
-  return { pos: _rp, look: _rl, fov };
-}
+function startReplay() { const B = S.B; BC.startReplay(B, B.replayKind, afterBall); }
 
 /* ---------- per-frame game logic ---------- */
 const tmpV = new THREE.Vector3(), tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
@@ -528,11 +595,12 @@ function tickGame(dt) {
   const st = G.striker;
   if (userBatting() && !B.swung && (S.phase === 'wait' || S.phase === 'runup' || S.phase === 'delivery')) { B.fanT = (B.fanT || 0) - dt; if (B.fanT <= 0) { B.fanT = 0.25; refreshFans(); } }
 
-  if (S.phase === 'replay') {
-    const R = S.replay;
-    R.t += dt * R.speed;
-    W.recApply(Math.min(R.t, R.t1));
-    if (R.t >= R.t1) afterBall();
+  if (S.phase === 'replay') { BC.tickReplay(dt); return; }
+  if (S.phase === 'walk') { updateRigs(dt); S.walkT -= dt; if (S.walkT <= 0) endWalk(); return; }
+  if (S.phase === 'review') {
+    updateRigs(dt); W.recCapture(S.recT);
+    B.reviewWait -= dt;
+    if (B.reviewWait <= 0) { BC.lowerHide(); BC.startTV3(B, B.ro.result === 'out', B.ro.result === 'out' ? 'Bat short of the crease' : 'Bat grounded in time', () => settleRunOut(B)); }
     return;
   }
 
@@ -642,18 +710,25 @@ function tickGame(dt) {
           const hand = handR(P, new THREE.Vector3());
           if (tt < pick) p = hand;
           else {
-            const k = clamp((tt - pick) / Math.max(0.1, r.throwT - pick), 0, 1);
-            const toBowlerEnd = Math.hypot(r.at.x, r.at.z - 10.06) < Math.hypot(r.at.x, r.at.z + 10.06);
+            const ro = B.ro, end = ro ? ro.end : 0, thT = ro ? ro.throwT : r.throwT;
+            const k = clamp((tt - pick) / Math.max(0.1, thT - pick), 0, 1);
             if (!B.from) B.from = hand.clone();
-            const dest = toBowlerEnd ? handPos(G.bowler, new THREE.Vector3()) : handPos(G.fielders[0], new THREE.Vector3());
+            const atStumps = ro && ro.k > 0 && ro.direct;
+            const dest = atStumps ? new THREE.Vector3(0, 0.42, end ? 10.06 : -10.06) : handPos(end ? G.bowler : G.fielders[0], new THREE.Vector3());
             const dist = Math.hypot(dest.x - B.from.x, dest.z - B.from.z);
-            p = { x: lerp(B.from.x, dest.x, k), y: lerp(B.from.y, dest.y, k) + Math.sin(k * Math.PI) * dist * 0.07, z: lerp(B.from.z, dest.z, k) };
+            p = (atStumps && B.broken) ? { x: 0.2, y: 0.06, z: end ? 11.2 : -11.2 } : { x: lerp(B.from.x, dest.x, k), y: lerp(B.from.y, dest.y, k) + Math.sin(k * Math.PI) * dist * 0.07, z: lerp(B.from.z, dest.z, k) };
             if (k >= 1 && !B.caughtThrow) { B.caughtThrow = true; SND.glove(); }
           }
         }
       }
     }
     W.placeBall(p, false);
+    if (B.it > 1.8 && !$('#timing').hidden) $('#timing').hidden = true;
+    if (B.ro && B.ro.k > 0) {
+      if (!B.broken && B.it >= B.ro.Tb) breakForRunOut(B);
+      if (B.ro.close && !B.stretched) { const R = B.ro.runnerIsStriker ? G.striker : G.nonStriker; if (R.runLeg === B.ro.k && R.target && Math.abs(R.target.z - R.g.position.z) < 3.2) { B.stretched = true; act(R, 'stretch', 1.2, { fade: 0.08 }); } }
+    }
+    BC.direct(B, dt);
     GUIDE.tracePush(p);
     B.maxY = Math.max(B.maxY || 0, p.y);
     if (!B.bounceMk && B.maxY > 1.4 && p.y < 0.09) { B.bounceMk = true; GUIDE.traceMark(p.x, p.z, 0xffffff); }
@@ -662,8 +737,8 @@ function tickGame(dt) {
       if (r.kind === 'caught') finishBall({ runs: 0, wicket: true, how: 'caught', replay: 'caught' });
       else if (r.kind === 'six') finishBall({ runs, replay: 'six' });
       else if (r.kind === 'four') finishBall({ runs, replay: B.shot.grade === 'perfect' && Math.random() < 0.5 ? 'four' : null });
-      else finishBall({ runs, banner: runs ? ['plain', `${runs} run${runs > 1 ? 's' : ''}`, ''] : null });
-      if (!runs && r.kind === 'fielded') toast(r.dropped ? 'Dropped · no run' : 'Fielded · no run');
+      else if (B.ro && B.ro.k > 0 && B.ro.close) { S.phase = 'review'; B.reviewWait = 0.9; }
+      else { const rr = B.ro ? B.ro.k : runs; finishBall({ runs: rr, banner: rr ? ['plain', `${rr} run${rr > 1 ? 's' : ''}`, ''] : null }); if (!rr && r.kind === 'fielded') toast(r.dropped ? 'Dropped · no run' : 'Fielded · no run'); }
     }
   }
 
@@ -682,37 +757,9 @@ function tickGame(dt) {
 const camPos = new THREE.Vector3(0, 20, 60), camLook = new THREE.Vector3();
 const tA = new THREE.Vector3(), tB = new THREE.Vector3();
 function tickCamera(dt, t) {
-  const cam = W.camera, narrow = innerWidth < innerHeight;
-  let pos, look, fov = 50, k = 1 - Math.pow(0.002, dt);
-  if (S.cam === 'orbit') {
-    const a = t * 0.045 + 0.6;
-    pos = tA.set(Math.sin(a) * 52, 11 + Math.sin(t * 0.13) * 3, Math.cos(a) * 52); look = tB.set(0, 3, 0); fov = narrow ? 62 : 48; k = 1;
-  } else if (S.cam === 'vs') {
-    const a = t * 0.12;
-    pos = tA.set(Math.sin(a) * 9 + 1, 2.2, -9 + Math.cos(a) * 9); look = tB.set(0.3, 1.1, -9.3); fov = 40; k = 1;
-  } else if (S.cam === 'bat') {
-    pos = tA.set(-0.75, narrow ? 3.7 : 3.3, narrow ? -15.2 : -14.6); look = tB.set(-0.1, 0.25, 5); fov = narrow ? 62 : 46;
-  } else if (S.cam === 'bowl') {
-    const aiming = S.phase === 'aim' || S.phase === 'meter';
-    pos = tA.set(0.5, aiming ? 7.5 : 3.3, aiming ? 19.5 : 25.5); look = tB.set(0, 0.4, aiming ? -5 : -8); fov = narrow ? 64 : 48;
-    if (!aiming && S.B && S.phase === 'runup') { pos.z = Math.max(G.bowler.g.position.z + 4.5, 13.5); }
-    if (!aiming && S.phase === 'delivery') pos.z = 13.5;
-  } else if (S.cam === 'chase') {
-    const b = W.ball.position, bx = 0, bz = -8;
-    const dx = b.x - bx, dz = b.z - bz, d = Math.hypot(dx, dz) || 1;
-    const back = Math.min(18, 8 + d * 0.2);
-    pos = tA.set(bx - dx / d * back, 8 + Math.min(16, d * 0.22), bz - dz / d * back);
-    look = tB.set(b.x, Math.max(0.6, b.y * 0.85), b.z);
-    fov = clamp(54 - d * 0.18, 36, 54) + (narrow ? 12 : 0);
-    k = 1 - Math.pow(0.02, dt);
-  } else if (S.cam === 'replay' && S.replay) {
-    const r = replayCam(S.replay); pos = r.pos; look = r.look; fov = r.fov + (narrow ? 14 : 0); k = 1 - Math.pow(0.0005, dt);
-  }
-  if (pos) { camPos.lerp(pos, k); camLook.lerp(look, Math.min(1, k * 1.6)); }
-  cam.fov += (fov - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix();
-  cam.position.copy(camPos);
-  if (S.shake > 0) { cam.position.x += (Math.random() - 0.5) * S.shake * 0.5; cam.position.y += (Math.random() - 0.5) * S.shake * 0.5; S.shake = Math.max(0, S.shake - dt); }
-  cam.lookAt(camLook);
+  if (S.cam !== 'none') return BC.update(dt, t);
+  const cam = W.camera;                      // manual camera (used by tests and debugging)
+  cam.position.copy(camPos); cam.lookAt(camLook); cam.updateProjectionMatrix();
 }
 
 /* ---------- input ---------- */
@@ -731,10 +778,11 @@ let dragging = false;
 $('#c').addEventListener('pointerdown', ev => {
   SND.init();
   if (S.paused) return;
-  if (S.phase === 'replay') { if (S.replay) S.replay.t = S.replay.t1; return; }
+  if (S.phase === 'replay') { BC.skip(); return; }
+  if (S.phase === 'walk') { S.walkT = Math.min(S.walkT, 0.05); return; }
   if (S.phase === 'aim') { dragging = true; aimPitch(ev); return; }
   if (S.phase === 'meter') { releaseMeter(); return; }
-  if (S.phase === 'delivery' && userBatting()) { userSwing(clamp(((ev.clientX / innerWidth) * 2 - 1) * 1.15, -1, 1), ev.clientY < innerHeight * 0.55); return; }
+  if (S.phase === 'delivery' && userBatting()) { const sx = clamp(((ev.clientX / innerWidth) * 2 - 1) * 1.15, -1, 1); userSwing(tvView() ? -sx : sx, ev.clientY < innerHeight * 0.55); return; }
   if (S.phase === 'inplay' && S.B && S.B.it > 0.6) { const B = S.B; if (B.res && (B.res.kind === 'six' || B.res.kind === 'four') && !B.flashed) B.it = B.res.t; else B.it = Math.max(B.it, B.endT - 0.05); }
 });
 addEventListener('pointermove', ev => { if (dragging && S.phase === 'aim') aimPitch(ev); });
@@ -742,9 +790,10 @@ addEventListener('pointerup', () => { dragging = false; });
 addEventListener('keydown', ev => {
   if (ev.code === 'Escape' && S.match && !$('#hud').hidden) { togglePause(); return; }
   if (S.paused) return;
-  if (S.phase === 'replay' && (ev.code === 'Space' || ev.code === 'Enter')) { ev.preventDefault(); S.replay.t = S.replay.t1; return; }
+  if (S.phase === 'replay' && (ev.code === 'Space' || ev.code === 'Enter')) { ev.preventDefault(); BC.skip(); return; }
+  if (S.phase === 'walk' && (ev.code === 'Space' || ev.code === 'Enter')) { ev.preventDefault(); S.walkT = 0.05; return; }
   if (S.phase === 'delivery' && userBatting()) {
-    const map = { ArrowLeft: [-0.75, false], ArrowDown: [0, false], ArrowRight: [0.75, false], KeyQ: [-0.75, true], ArrowUp: [0, true], KeyE: [0.75, true], Space: [0, false] };
+    const sL = tvView() ? 0.75 : -0.75, map = { ArrowLeft: [sL, false], ArrowDown: [0, false], ArrowRight: [-sL, false], KeyQ: [sL, true], ArrowUp: [0, true], KeyE: [-sL, true], Space: [0, false] };
     const a = map[ev.code]; if (a) { ev.preventDefault(); userSwing(a[0], a[1]); }
     return;
   }
@@ -792,6 +841,16 @@ $('#bMute').addEventListener('click', () => { const on = SND.toggle(); $('#muteW
 $('#bPause').addEventListener('click', togglePause);
 $('#resumeBtn').addEventListener('click', togglePause);
 $('#quitBtn').addEventListener('click', () => { S.paused = false; $('#pause').hidden = true; S.match = null; goMenu(); });
+const tvView = () => S.settings.view !== 'bat';
+function layoutPad() {
+  const tv = tvView(), order = tv ? [0.75, 0, -0.75] : [-0.75, 0, 0.75], name = { '-0.75': 'Leg', '0': 'Straight', '0.75': 'Off' };
+  const arrows = [['↖', '↑', '↗'], ['←', '↓', '→']];
+  const btns = [...document.querySelectorAll('#shotPad button')];
+  btns.forEach((b, i) => { const r = i < 3 ? 0 : 1, c = i % 3; b.dataset.aim = order[c]; b.dataset.loft = r === 0 ? '1' : '0'; b.innerHTML = `<span>${arrows[r][c]}</span>${name[String(order[c])]}`; });
+  $('#aimGuide .zl').textContent = tv ? '◀ Off side' : '◀ Leg side';
+  $('#aimGuide .zr').textContent = tv ? 'Leg side ▶' : 'Off side ▶';
+}
+$('#bCam').addEventListener('click', () => { S.settings.view = tvView() ? 'bat' : 'tv'; save(); layoutPad(); toast(tvView() ? 'TV camera' : 'Batter camera'); if (S.match && S.B && userBatting()) refreshFans(); });
 function togglePause() { S.paused = !S.paused; $('#pause').hidden = !S.paused; }
 
 /* ---------- screens ---------- */
@@ -842,7 +901,7 @@ function showVs() {
   G.fieldAll.forEach((P, i) => { const pl = Bt.players[(i + 1) % 11]; kit(P, Bt, pl.num, pl.short); });
   kit(G.striker, A, A.players[0].num, A.players[0].short); kit(G.nonStriker, A, A.players[1].num, A.players[1].short);
   showScreen('vs');
-  $('#vsKick').textContent = `${S.settings.time === 'day' ? 'Day' : 'Night'} match · ${m.maxBalls / 6} overs · ${m.maxWkts} wickets`;
+  $('#vsKick').textContent = `Dubai · ${S.settings.time === 'day' ? 'day' : 'night'} match · ${m.maxBalls / 6} overs · ${m.maxWkts} wickets`;
   $('#vsA').src = crest(A); $('#vsB').src = crest(Bt); $('#vsAn').textContent = A.name; $('#vsBn').textContent = Bt.name;
   $('#coinA').src = crest(A); $('#coinB').src = crest(Bt);
   const coin = $('#coin'); coin.classList.remove('flip'); coin.style.transform = '';
@@ -969,6 +1028,7 @@ async function start(data) {
   W.setTime(S.settings.time);
   buildRigs();
   buildMenu();
+  layoutPad();
   previewKits();
   W.paintCrowd(TEAMS[S.settings.team].c1, '#ffffff');
   $('#loading').hidden = true;

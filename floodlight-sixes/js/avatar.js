@@ -44,6 +44,7 @@ const AV = (() => {
     const body = root.getObjectByName('Wolf3D_Body') || (() => { let s; root.traverse(o => { if (!s && o.isSkinnedMesh) s = o; }); return s; })();
     A.skeleton = body.skeleton; A.bindMatrix = body.bindMatrix.clone(); A.bodyParent = body.parent;
     const b = n => wpos(bone(root, n));
+    { const hm = root.getObjectByName('Wolf3D_Head'); A.skull = new THREE.Box3().setFromObject(hm); }
     A.bp = {}; MAIN.concat(['Head', 'HeadTop_End']).forEach(n => { const o = bone(root, n); if (o) A.bp[n] = wpos(o); });
     A.restWorldQ = {}; A.restLocalQ = {}; A.restLocalP = {};
     root.traverse(o => { if (o.isBone) { A.restWorldQ[o.name] = o.getWorldQuaternion(Q()); A.restLocalQ[o.name] = o.quaternion.clone(); A.restLocalP[o.name] = o.position.clone(); } });
@@ -189,14 +190,27 @@ const AV = (() => {
     const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.135, 0.06, 18, 1, true, Math.PI * 0.55, Math.PI * 0.9), shell);
     guard.position.copy(c).add(new THREE.Vector3(0, -0.07, -0.01)); guard.userData.role = 'helmet'; attach(root, 'Head', guard);
   }
+  function skullFrame() {
+    const B = A.skull, c = B.getCenter(V()), sz = B.getSize(V());
+    // the head mesh's box includes the nose and chin; the cranium sits a little back and up
+    return { c: new THREE.Vector3(c.x, B.max.y - sz.x * 0.52, c.z - sz.z * 0.08), rx: sz.x * 0.52, top: B.max.y, front: B.max.z };
+  }
+  function addHair(root) {
+    const { c, rx } = skullFrame();
+    const hm = new THREE.MeshStandardMaterial({ color: 0x14100d, roughness: 0.9 }); hm.userData.role = 'hair';
+    const h = new THREE.Mesh(new THREE.SphereGeometry(rx * 1.07, 26, 14, 0, TAU, 0, Math.PI * 0.58), hm);
+    h.position.copy(c).add(new THREE.Vector3(0, 0.004, -0.008)); h.scale.set(1, 1.04, 1.14); h.rotation.x = -0.22; h.userData.role = 'hair';
+    attach(root, 'Head', h);
+  }
   function addCap(root) {
-    const { c } = headFrame();
-    const cm = new THREE.MeshStandardMaterial({ color: 0x1a2a40, roughness: 0.65 }); cm.userData.role = 'cap';
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.128, 24, 12, 0, TAU, 0, Math.PI * 0.46), cm);
-    dome.position.copy(c).add(new THREE.Vector3(0, 0.02, -0.008)); dome.scale.set(1.0, 1.05, 1.12); dome.userData.role = 'cap';
+    const { c, rx, front } = skullFrame();
+    const cm = new THREE.MeshStandardMaterial({ color: 0x1a2a40, roughness: 0.7 }); cm.userData.role = 'cap';
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(rx * 1.13, 28, 14, 0, TAU, 0, Math.PI * 0.5), cm);
+    dome.position.copy(c).add(new THREE.Vector3(0, 0.006, -0.004)); dome.scale.set(1.0, 0.98, 1.16); dome.rotation.x = -0.12; dome.userData.role = 'cap';
     attach(root, 'Head', dome);
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.012, 20, 1, false, -Math.PI / 2, Math.PI), cm);
-    brim.position.copy(c).add(new THREE.Vector3(0, 0.055, 0.1)); brim.scale.set(0.95, 1, 1.3); brim.rotation.x = 0.16; brim.userData.role = 'cap';
+    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), cm); btn.position.copy(c).add(new THREE.Vector3(0, rx * 1.1 + 0.004, -0.01)); btn.userData.role = 'cap'; attach(root, 'Head', btn);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(rx * 1.05, rx * 1.05, 0.01, 24, 1, false, -Math.PI / 2, Math.PI), cm);
+    brim.position.set(c.x, c.y + 0.012, front - 0.035); brim.scale.set(1, 1, 1.25); brim.rotation.x = 0.2; brim.userData.role = 'cap';
     attach(root, 'Head', brim);
   }
   function buildTemplates() {
@@ -205,8 +219,8 @@ const AV = (() => {
     const make = (kind) => {
       const t = SU.clone(A.base); t.updateMatrixWorld(true);
       if (kind === 'batter') { addHelmet(t); addPads(t); addGloves(t); }
-      else if (kind === 'keeper') { addCap(t); addPads(t, true); addGloves(t, true); }
-      else addCap(t);
+      else if (kind === 'keeper') { addHair(t); addCap(t); addPads(t, true); addGloves(t, true); }
+      else { addHair(t); addCap(t); }
       return t;
     };
     A.templates = { batter: make('batter'), keeper: make('keeper'), fielder: make('fielder') };
@@ -221,6 +235,16 @@ const AV = (() => {
     const names = [];
     A.base.traverse(o => { if (o.isBone && srcBone(o.name)) names.push(o.name); });
     names.forEach(n => { restSrc[n] = srcBone(n).getWorldQuaternion(Q()); });
+    // The source rests in a T-pose and our model in an A-pose: line each bone's rest direction up first,
+    // so 'arms by the sides' in the clip means arms by the sides here too.
+    const CHILD = { Hips: 'Spine', Spine: 'Spine1', Spine1: 'Spine2', Spine2: 'Neck', Neck: 'Head', Head: 'HeadTop_End', LeftShoulder: 'LeftArm', LeftArm: 'LeftForeArm', LeftForeArm: 'LeftHand', LeftHand: 'LeftHandMiddle1', RightShoulder: 'RightArm', RightArm: 'RightForeArm', RightForeArm: 'RightHand', RightHand: 'RightHandMiddle1', LeftUpLeg: 'LeftLeg', LeftLeg: 'LeftFoot', LeftFoot: 'LeftToeBase', RightUpLeg: 'RightLeg', RightLeg: 'RightFoot', RightFoot: 'RightToeBase' };
+    const align = {};
+    names.forEach(nm => {
+      const c = CHILD[nm], db = bone(A.base, nm), dc = c && bone(A.base, c), sb = srcBone(nm), sc = c && srcBone(c);
+      if (!dc || !sc || nm === 'Hips') { align[nm] = Q(); return; }
+      const dd = wpos(dc).sub(wpos(db)).normalize(), sd = wpos(sc).sub(wpos(sb)).normalize();
+      align[nm] = Q().setFromUnitVectors(dd, sd);
+    });
     const srcHipsY = wpos(srcBone('Hips')).y, dstHips = A.restLocalP.Hips, ratio = A.bp.Hips.y / srcHipsY;
     const act = mixer.clipAction(clip); act.play();
     const fps = 30, n = Math.max(2, Math.round(clip.duration * fps) + 1);
@@ -235,7 +259,7 @@ const AV = (() => {
       const Wt = {};
       names.forEach(nm => {
         const wx = srcBone(nm).getWorldQuaternion(Q());
-        const w = wx.multiply(restSrc[nm].clone().invert()).multiply(A.restWorldQ[nm]);
+        const w = wx.multiply(restSrc[nm].clone().invert()).multiply(align[nm]).multiply(A.restWorldQ[nm]);
         Wt[nm] = w;
         const pn = parentName[nm];
         const pw = pn ? (Wt[pn] || A.restWorldQ[pn]) : armatureQ;
@@ -273,8 +297,9 @@ const AV = (() => {
     MAIN.forEach(n => { S.proc[n] = Q(); S.moc[n] = Q(); });
     P.av = S;
     // skin tone variety
-    const tone = [1, 0.86, 0.7, 0.58, 0.5, 0.92][Math.floor(Math.random() * 6)];
-    o.traverse(n => { if (n.isMesh && n.userData.role === 'skin') n.material.color.setRGB(tone, tone * 0.93, tone * 0.88); if (n.isMesh && n.userData.role === 'beard') n.visible = Math.random() < 0.35; });
+    const TONES = [[0.86, 0.64, 0.5], [0.76, 0.54, 0.4], [0.66, 0.46, 0.33], [0.58, 0.4, 0.29], [0.9, 0.7, 0.56], [0.7, 0.5, 0.37]];
+    const tone = TONES[Math.floor(Math.random() * TONES.length)];
+    o.traverse(n => { if (n.isMesh && n.userData.role === 'skin') { n.material.color.setRGB(tone[0], tone[1], tone[2]); n.material.roughness = 0.62; } if (n.isMesh && n.userData.role === 'beard') n.visible = Math.random() < 0.35; });
     return S;
   }
   function isUnder(n, root) { for (let p = n; p; p = p.parent) if (p === root) return true; return false; }

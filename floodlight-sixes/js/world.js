@@ -47,16 +47,16 @@ const WORLD = (() => {
       bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.55, 0.8);
       composer.addPass(bloom);
       grade = new THREE.ShaderPass({
-        uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.08 }, uLift: { value: new THREE.Vector3(0, 0, 0) }, uRes: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uSharp: { value: 0.9 } },
+        uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.08 }, uLift: { value: new THREE.Vector3(0, 0, 0) }, uRes: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uSharp: { value: 0.9 }, uCon: { value: 1.12 } },
         vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
         fragmentShader: [
-          'uniform sampler2D tDiffuse; uniform float uVig; uniform float uSat; uniform vec3 uLift; uniform vec2 uRes; uniform float uSharp; varying vec2 vUv;',
+          'uniform sampler2D tDiffuse; uniform float uVig; uniform float uSat; uniform vec3 uLift; uniform vec2 uRes; uniform float uSharp; uniform float uCon; varying vec2 vUv;',
           'vec3 toSRGB(vec3 c){ return mix(c * 12.92, 1.055 * pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c)); }',
           'void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb;',
           ' vec3 nb = texture2D(tDiffuse, vUv + vec2(uRes.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(uRes.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, uRes.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, uRes.y)).rgb;',
           ' c += clamp(c - nb * 0.25, -0.07, 0.07) * uSharp;',
           ' c = toSRGB(max(c, 0.0));',
-          ' float l = dot(c, vec3(0.299,0.587,0.114)); c = mix(vec3(l), c, uSat) + uLift;',
+          ' float l = dot(c, vec3(0.299,0.587,0.114)); c = mix(vec3(l), c, uSat) + uLift; c = (c - 0.45) * uCon + 0.45;',
           ' vec2 d = vUv - 0.5; c *= 1.0 - uVig * dot(d, d) * 2.2;',
           ' gl_FragColor = vec4(c, 1.0); }'].join('\n'),
       });
@@ -173,13 +173,13 @@ const WORLD = (() => {
     scene.environment = (day && h) ? h.env : W.roomEnv;
     W.skyline.material.opacity = day ? 0.0 : 1;
     scene.fog.color.set(day ? 0xc3d8ec : 0x0b1528); scene.fog.near = day ? 260 : 160; scene.fog.far = day ? 900 : 600;
-    W.hemi.color.set(day ? 0xe4f0ff : 0xa9bdff); W.hemi.groundColor.set(day ? 0x4e7040 : 0x1c3a20); W.hemi.intensity = day ? 0.8 : 0.55;
+    W.hemi.color.set(day ? 0xe4f0ff : 0xa9bdff); W.hemi.groundColor.set(day ? 0x4e7040 : 0x1c3a20); W.hemi.intensity = day ? 0.7 : 0.42;
     W.key.color.set(day ? 0xfff2dc : 0xfff0d8); W.key.intensity = day ? 2.1 : 1.25;
     W.key.position.set(day ? 55 : -22, day ? 95 : 110, day ? 35 : -16);
     W.fill.intensity = day ? 0.25 : 0.45; W.fill2.intensity = day ? 0.15 : 0.4; W.fill3.intensity = day ? 0.1 : 0.35;
-    renderer.toneMappingExposure = day ? 0.95 : 1.05;
+    renderer.toneMappingExposure = day ? 0.9 : 0.92;
     if (bloom) { bloom.strength = day ? 0.18 : 0.7; bloom.threshold = day ? 0.93 : 0.86; bloom.radius = day ? 0.3 : 0.55; }
-    if (grade) { grade.uniforms.uVig.value = day ? 0.22 : 0.34; grade.uniforms.uSat.value = day ? 1.1 : 1.06; }
+    if (grade) { grade.uniforms.uVig.value = day ? 0.22 : 0.3; grade.uniforms.uSat.value = day ? 1.14 : 1.16; }
     W.glows.forEach(s => s.visible = !day);
     W.beams.forEach(b => b.visible = !day && W.quality === 'high');
     W.lampMat.color.setScalar(day ? 0.55 : 1);
@@ -214,11 +214,11 @@ const WORLD = (() => {
       const my = h / 26, mx = w / 3.4, cx = w / 2;
       const blot = (x, y, rx, ry, col, a) => { g.save(); g.translate(x, y); g.scale(rx, ry); const r = g.createRadialGradient(0, 0, 0, 0, 0, 1); r.addColorStop(0, col.replace('A', a)); r.addColorStop(1, col.replace('A', 0)); g.fillStyle = r; g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); g.restore(); };
       const base = g.createLinearGradient(0, 0, w, 0);
-      [[0, '#6f8a4a'], [0.1, '#97965d'], [0.26, '#b09a62'], [0.5, '#bca46a'], [0.74, '#b09a62'], [0.9, '#97965d'], [1, '#6f8a4a']].forEach(([o, c]) => base.addColorStop(o, c));
+      [[0, '#b39760'], [0.2, '#c4a86f'], [0.5, '#cdb27a'], [0.8, '#c4a86f'], [1, '#b39760']].forEach(([o, c]) => base.addColorStop(o, c));
       g.fillStyle = base; g.fillRect(0, 0, w, h);
       for (let i = 0; i < 9; i++) { g.fillStyle = i % 2 ? 'rgba(255,248,222,.045)' : 'rgba(80,60,30,.045)'; g.fillRect(w * (0.1 + i * 0.09), 0, w * 0.09, h); }
       for (let i = 0; i < 170; i++) { const dark = Math.random() < 0.5; blot(Math.random() * w, Math.random() * h, 12 + Math.random() * 60, 20 + Math.random() * 110, dark ? 'rgba(96,76,42,A)' : 'rgba(255,246,218,A)', 0.11); }
-      const N = hi ? 80000 : 45000;
+      const N = hi ? 110000 : 60000;
       for (let i = 0; i < N; i++) {
         const x = w * (0.04 + Math.random() * 0.92), y = Math.random() * h, l = 4 + Math.random() * 15, a = 0.04 + Math.random() * 0.13;
         g.strokeStyle = Math.random() < 0.55 ? `rgba(84,64,34,${a * 0.8})` : `rgba(240,226,190,${a * 0.7})`; g.lineWidth = 0.5 + Math.random() * 0.8;
@@ -248,7 +248,7 @@ const WORLD = (() => {
       for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(0,0,0,${0.15 + Math.random() * 0.3})`; const sg = Math.random() < 0.5 ? -1 : 1; g.fillRect(Math.random() * w, h / 2 + sg * (8.84 + (Math.random() < 0.5 ? 0 : 1.22)) * my + (Math.random() - 0.5) * lw, 1 + Math.random() * 2, 1); }
       g.globalCompositeOperation = 'destination-in';
       const mk = g.createLinearGradient(0, 0, w, 0);
-      [[0, 0], [0.05, 0.5], [0.13, 1], [0.87, 1], [0.95, 0.5], [1, 0]].forEach(([o, a]) => mk.addColorStop(o, `rgba(0,0,0,${a})`));
+      [[0, 0], [0.012, 1], [0.988, 1], [1, 0]].forEach(([o, a]) => mk.addColorStop(o, `rgba(0,0,0,${a})`));
       g.fillStyle = mk; g.fillRect(0, 0, w, h);
       const mv = g.createLinearGradient(0, 0, 0, h);
       [[0, 0], [0.025, 1], [0.975, 1], [1, 0]].forEach(([o, a]) => mv.addColorStop(o, `rgba(0,0,0,${a})`));

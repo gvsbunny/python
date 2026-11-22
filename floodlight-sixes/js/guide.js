@@ -156,7 +156,7 @@ const GUIDE = (() => {
     M.md.rotation.z = -M.ph * 0.9;
     const pulse = (1 + Math.sin(M.ph * 5) * 0.035) * ds;
     M.mc.scale.setScalar(pulse); M.md.scale.setScalar(ds);
-    M.lab.s.scale.set(1.5 * ds, 0.375 * ds, 1); M.lab.s.position.z = 0.95 * ds; M.lab.s.position.y = 0.55 * ds;
+    const ls = Math.min(ds, 1.5); M.lab.s.scale.set(1.2 * ls, 0.3 * ls, 1); M.lab.s.position.z = 0.95 + 0.55 * ds; M.lab.s.position.y = 0.12;
     const rp = (M.ph * 0.85) % 1;
     M.mr.scale.setScalar((0.45 + rp * 1.05) * ds);
     M.mr.material.opacity = (1 - rp) * 0.85 * M.fade; M.mr.material.color.copy(M.col);
@@ -191,13 +191,12 @@ const GUIDE = (() => {
     const tex = ctex(Math.round(Wd * PX), Math.round(Ln * PX), (g, w, h) => {
       const zones = [[-10.06, -7.86, 0xffc93c, 'YORKER'], [-7.86, -5.56, 0x9be37a, 'FULL'], [-5.56, -2.56, 0x4fd3ff, 'GOOD LENGTH'], [-2.56, 2, 0xff5468, 'SHORT']];
       zones.forEach(([a, b, c, name]) => {
-        const y0 = (a + 10.06) / Ln * h, y1 = (b + 10.06) / Ln * h;
-        const gr = g.createLinearGradient(0, y0, 0, y1); const col = css(c);
-        gr.addColorStop(0, col + '55'); gr.addColorStop(1, col + '22');
-        g.fillStyle = gr; g.fillRect(0, y0 + 2, w, y1 - y0 - 4);
-        g.fillStyle = col + 'dd'; g.fillRect(0, y0, w, 3);
-        g.font = `800 ${Math.round(PX * 0.2)}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.55)'; g.strokeText(name, w / 2, (y0 + y1) / 2); g.fillStyle = '#fff'; g.fillText(name, w / 2, (y0 + y1) / 2);
+        const y0 = (a + 10.06) / Ln * h, y1 = (b + 10.06) / Ln * h, col = css(c);
+        g.fillStyle = col + '1a'; g.fillRect(0, y0, w, y1 - y0);
+        g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, y0 - 1, w, 6);
+        g.fillStyle = col + 'f0'; g.fillRect(0, y0, w, 4);
+        g.font = `800 ${Math.round(PX * 0.15)}px ${FONT}`; g.textAlign = 'left'; g.textBaseline = 'top';
+        g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.6)'; g.strokeText(name, 8, y0 + 8); g.fillStyle = col; g.fillText(name, 8, y0 + 8);
       });
     });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(Wd, Ln), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));

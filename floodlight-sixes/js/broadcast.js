@@ -44,14 +44,15 @@ const BC = (() => {
       }
       case 'tv3front': { const e = sh.end, sg = e ? 1 : -1, ez = e ? 10.06 : -10.06; P.set(-0.55, 0.55, ez + sg * 2.6); L.set(-0.2, 0.5, ez - sg * 6); fov = narrow() ? 46 : 34; break; }
       case 'follow': {
-        const F = sh.F.g.position; P.set(F.x + sh.off.x, sh.off.y, F.z + sh.off.z); L.set(F.x, 1.45, F.z);
+        const F = sh.F.g.position, r = sh.F.g.rotation.y, fx = Math.sin(r), fz = Math.cos(r);
+        P.set(F.x + fx * 6.5 + fz * 1.2, 1.75, F.z + fz * 6.5 - fx * 1.2); L.set(F.x, 1.45, F.z);
         fov = narrow() ? 30 : 21; kp = 1 - Math.exp(-dt * 4); kl = k8; break;
       }
       case 'newBat': {
         const F = sh.F.g.position, T = sh.T; const dx = T.x - F.x, dz = T.z - F.z, d = Math.hypot(dx, dz) || 1;
         P.set(F.x + dx / d * 5.5 + 1.2, 1.7, F.z + dz / d * 5.5); L.set(F.x, 1.4, F.z); fov = narrow() ? 34 : 24; kp = 1 - Math.exp(-dt * 3); break;
       }
-      case 'batterCU': { const F = sh.F.g.position; P.set(F.x - 3.1, 1.55, F.z + 1.3); L.set(F.x, 1.45, F.z); fov = narrow() ? 30 : 20; kp = 1 - Math.exp(-dt * 3); break; }
+      case 'batterCU': { const F = sh.F.g.position, r = sh.F.g.rotation.y, fx = Math.sin(r), fz = Math.cos(r); P.set(F.x + fx * 3.6 + fz * 1.1, 1.6, F.z + fz * 3.6 - fx * 1.1); L.set(F.x, 1.4, F.z); fov = narrow() ? 34 : 22; kp = 1 - Math.exp(-dt * 2.5); break; }
       case 'spider': { const a = sh.t * 0.09 + 0.8; P.set(Math.sin(a) * 26, 28, -4 + Math.cos(a) * 20); L.set(0, 0, -2); fov = narrow() ? 62 : 46; kp = 1; kl = 1; break; }
       // replay angles (the ball and players come from the recording)
       case 'rp-bowled': P.set(0.9, 0.42, -13.4); L.set(0, 0.45, -8.5); fov = 34; break;
@@ -126,9 +127,9 @@ const BC = (() => {
   /* ---------- graphics ---------- */
   function lower(l1, l2, color) {
     const el = $('#lower'); el.querySelector('.l1').textContent = l1; el.querySelector('.l2').textContent = l2 || '';
-    el.style.setProperty('--lc', color || 'var(--flood)'); el.hidden = false; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    el.style.setProperty('--lc', color || 'var(--flood)'); el.hidden = false; $('#hud').classList.add('cap'); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
-  function lowerHide() { $('#lower').hidden = true; }
+  function lowerHide() { $('#lower').hidden = true; $('#hud').classList.remove('cap'); }
   function wipe() { const w = $('#wipe'); w.hidden = false; w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); }
   function tag(text, tv3) { const t = $('#replayTag'); t.hidden = false; t.classList.toggle('tv3', !!tv3); t.querySelector('b').textContent = text; }
   function decision(out, sub) {
